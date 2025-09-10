@@ -1,20 +1,20 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod account_mock;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod common;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod config_mock;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod cache_mock;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod rpc_mock;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod toml_mock;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod transaction_mock;

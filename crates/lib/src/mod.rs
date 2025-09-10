@@ -25,5 +25,5 @@ pub use error::KoraError;
 pub use signer::{Signature, Signer};
 pub use state::{get_all_signers, get_request_signer_with_signer_key};
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod tests;

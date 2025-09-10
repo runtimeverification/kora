@@ -66,7 +66,7 @@ pub struct SignerInfo {
 }
 
 impl SignerPool {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn new(signers: Vec<SignerWithMetadata>) -> Self {
         let total_weight: u32 = signers.iter().map(|s| s.weight).sum();
 

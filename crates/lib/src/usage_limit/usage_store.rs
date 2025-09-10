@@ -109,20 +109,20 @@ impl UsageStore for InMemoryUsageStore {
 }
 
 /// Mock store that simulates Redis errors for testing error handling
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub struct ErrorUsageStore {
     should_error_get: bool,
     should_error_increment: bool,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 impl ErrorUsageStore {
     pub fn new(should_error_get: bool, should_error_increment: bool) -> Self {
         Self { should_error_get, should_error_increment }
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 #[async_trait]
 impl UsageStore for ErrorUsageStore {
     async fn increment(&self, _key: &str) -> Result<u32, KoraError> {

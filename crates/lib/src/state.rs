@@ -75,7 +75,7 @@ pub fn get_all_signers() -> Result<Vec<crate::signer::SignerWithMetadata>, KoraE
 }
 
 /// Update the global signer configs with a new config (test only)
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub fn update_signer_pool(new_pool: SignerPool) -> Result<(), KoraError> {
     let mut pool_guard = GLOBAL_SIGNER_POOL.write();
 
@@ -108,7 +108,7 @@ pub fn get_config() -> Result<&'static Config, KoraError> {
 }
 
 /// Update the global config with a new full config (test only)
-#[cfg(test)]
+#[cfg(any(test, feature = "fuzzing"))]
 pub fn update_config(new_config: Config) -> Result<(), KoraError> {
     let old_ptr = GLOBAL_CONFIG.load(Ordering::Acquire);
     let new_ptr = Box::into_raw(Box::new(new_config));
