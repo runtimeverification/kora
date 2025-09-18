@@ -3,6 +3,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use kora_lib::{
     config,
+    fee::price::{PriceConfig, PriceModel},
     signer::{KoraSigner, SolanaMemorySigner},
     state::update_config,
     tests::{
@@ -26,6 +27,10 @@ impl<'a> Arbitrary<'a> for FuzzConfig {
 
         // Validation config
         let validation = &mut config.validation;
+
+        let n: u64 = u.arbitrary()?;
+        let margin = (n as f64) / (u64::MAX as f64);
+        validation.price = PriceConfig { model: PriceModel::Margin { margin: margin } };
 
         validation.token_2022 = config::Token2022Config::arbitrary(u)?;
 
