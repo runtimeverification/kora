@@ -1,22 +1,44 @@
 #![no_main]
 
-use kora_lib::signer::SolanaMemorySigner;
+use arbitrary::{Arbitrary, Unstructured};
+use kora_lib::{
+    config,
+    signer::{KoraSigner, SolanaMemorySigner},
+    state::update_config,
+    tests::{
+        config_mock::ConfigMockBuilder, rpc_mock::RpcMockBuilder,
+        transaction_mock::create_mock_transaction,
+    },
+    transaction::{VersionedTransactionOps, VersionedTransactionResolved},
+    Config,
+};
 use libfuzzer_sys::fuzz_target;
 use solana_sdk::signature::Keypair;
-use kora_lib::{Config, KoraError};
-use kora_lib::signer::KoraSigner;
-use kora_lib::state::update_config;
-use kora_lib::tests::config_mock::ConfigMockBuilder;
-use kora_lib::tests::transaction_mock::create_mock_transaction;
-use kora_lib::tests::rpc_mock::RpcMockBuilder;
-use kora_lib::transaction::{VersionedTransactionOps, VersionedTransactionResolved};
 use std::sync::Arc;
 
-fuzz_target!(|data: &[u8]| {
-    let config: Config = ConfigMockBuilder::new().build();
-    if update_config(config).is_err() {
-        panic!("Can't update config");
+struct FuzzConfig {
+    kora_config: Config,
+}
+
+impl<'a> Arbitrary<'a> for FuzzConfig {
+    fn arbitrary(u: &mut Unstructured<'a>) -> libfuzzer_sys::arbitrary::Result<Self> {
+        let mut config = ConfigMockBuilder::new().build();
+
+        // Validation config
+        let validation = &mut config.validation;
+
+        validation.token_2022 = config::Token2022Config::arbitrary(u)?;
+
+        Ok(Self { kora_config: config })
     }
+}
+
+fuzz_target!(|data: &[u8]| {
+    let mut u = Unstructured::new(data);
+    let fuzzconfig =
+        FuzzConfig::arbitrary(&mut u).expect("Couldn't generate arbitrary fuzzing configuration");
+    let config = fuzzconfig.kora_config;
+    update_config(config).expect("Couldn't update global config");
 
     let transaction = create_mock_transaction();
 
@@ -26,9 +48,5 @@ fuzz_target!(|data: &[u8]| {
     let keypair = Keypair::new();
     let signer = Arc::new(KoraSigner::Memory(SolanaMemorySigner::new(keypair)));
 
-    let res = pollster::block_on(tx.sign_transaction_if_paid(&signer, &rpc));
-
-    if res.is_err() {
-        panic!("Error signing! {res:?}");
-    }
+    let _res = pollster::block_on(tx.sign_transaction_if_paid(&signer, &rpc));
 });

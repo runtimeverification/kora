@@ -10,6 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 pollster = "0.4.0"
+arbitrary = { workspace = true, features = ["derive"] }
 solana-sdk = { workspace = true }
 
 [dependencies.kora-lib]
