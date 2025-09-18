@@ -134,6 +134,7 @@ impl ValidationConfig {
     }
 }
 
+#[cfg_attr(feature="fuzzing", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FeePayerPolicy {
     pub allow_sol_transfers: bool,

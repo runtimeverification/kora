@@ -28,6 +28,8 @@ impl<'a> Arbitrary<'a> for FuzzConfig {
         // Validation config
         let validation = &mut config.validation;
 
+        validation.fee_payer_policy = config::FeePayerPolicy::arbitrary(u)?;
+
         let n: u64 = u.arbitrary()?;
         let margin = (n as f64) / (u64::MAX as f64);
         validation.price = PriceConfig { model: PriceModel::Margin { margin: margin } };
