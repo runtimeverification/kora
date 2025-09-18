@@ -242,6 +242,39 @@ impl Token2022Config {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for Token2022Config {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::token::spl_token_2022_util;
+
+        let all_mint_extensions = spl_token_2022_util::get_all_mint_extension_names();
+        let all_account_extensions = spl_token_2022_util::get_all_account_extension_names();
+
+        let mut mint_extensions = Vec::new();
+        for ext in all_mint_extensions {
+            if bool::arbitrary(u)? {
+                mint_extensions.push(ext.to_string());
+            }
+        }
+
+        let mut account_extensions = Vec::new();
+        for ext in all_account_extensions {
+            if bool::arbitrary(u)? {
+                account_extensions.push(ext.to_string());
+            }
+        }
+
+        let mut res = Self::default();
+        res.blocked_mint_extensions = mint_extensions;
+        res.blocked_account_extensions = account_extensions;
+        if let Err(_) = res.initialize() {
+            panic!("Unexpected error in Token2022Config::arbitrary")
+        } else {
+            Ok(res)
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnabledMethods {
     pub liveness: bool,

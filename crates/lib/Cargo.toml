@@ -76,11 +76,12 @@ http-body-util = "0.1.3"
 prometheus = { workspace = true }
 regex = "1.11.1"
 tempfile = { version = "3.2", optional = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [features]
 default = []
 docs = []
-fuzzing = ["tempfile"]
+fuzzing = ["arbitrary", "tempfile"]
 
 [dev-dependencies]
 tempfile = "3.2"
