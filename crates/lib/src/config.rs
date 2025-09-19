@@ -276,6 +276,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Token2022Config {
     }
 }
 
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnabledMethods {
     pub liveness: bool,
