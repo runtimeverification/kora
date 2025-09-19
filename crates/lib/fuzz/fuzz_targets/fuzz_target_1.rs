@@ -27,6 +27,8 @@ impl<'a> Arbitrary<'a> for FuzzConfig {
 
         // Validation config
         let validation = &mut config.validation;
+        validation.max_allowed_lamports = u64::arbitrary(u)?;
+        validation.max_signatures = u64::arbitrary(u)?;
 
         validation.fee_payer_policy = config::FeePayerPolicy::arbitrary(u)?;
 
