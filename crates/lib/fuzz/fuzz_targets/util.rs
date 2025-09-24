@@ -13,7 +13,7 @@ pub struct FuzzConfig {
 
 impl<'a> Arbitrary<'a> for FuzzConfig {
     fn arbitrary(u: &mut Unstructured<'a>) -> libfuzzer_sys::arbitrary::Result<Self> {
-        let mut config = ConfigMockBuilder::new().build();
+        let mut config = ConfigMockBuilder::new().with_cache_enabled(false).build();
 
         // Validation config
         let validation = &mut config.validation;
