@@ -12,6 +12,7 @@ libfuzzer-sys = "0.4"
 pollster = "0.4.0"
 arbitrary = { workspace = true, features = ["derive"] }
 solana-sdk = { workspace = true }
+spl-token = { workspace = true }
 
 [dependencies.kora-lib]
 path = ".."
