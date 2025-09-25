@@ -32,7 +32,7 @@ impl From<FuzzAuthorityType> for AuthorityType {
 }
 
 #[derive(Arbitrary)]
-pub enum FuzzableSplIx<'a> {
+pub enum FuzzTokenIx<'a> {
     InitializeMint {
         decimals: u8,
         mint_authority: FuzzPubKey,
@@ -103,62 +103,62 @@ pub enum FuzzableSplIx<'a> {
     },
 }
 
-impl<'a> From<FuzzableSplIx<'a>> for TokenInstruction<'a> {
-    fn from(value: FuzzableSplIx<'a>) -> Self {
+impl<'a> From<FuzzTokenIx<'a>> for TokenInstruction<'a> {
+    fn from(value: FuzzTokenIx<'a>) -> Self {
         match value {
-            FuzzableSplIx::InitializeMint { decimals, mint_authority, freeze_authority } => {
+            FuzzTokenIx::InitializeMint { decimals, mint_authority, freeze_authority } => {
                 Self::InitializeMint {
                     decimals: decimals,
                     mint_authority: mint_authority.into(),
                     freeze_authority: freeze_authority.map(|a| a.into()).into(),
                 }
             }
-            FuzzableSplIx::InitializeAccount => Self::InitializeAccount,
-            FuzzableSplIx::InitializeMultisig { m } => Self::InitializeMultisig { m: m },
-            FuzzableSplIx::Transfer { amount } => Self::Transfer { amount: amount },
-            FuzzableSplIx::Approve { amount } => Self::Approve { amount: amount },
-            FuzzableSplIx::Revoke => Self::Revoke,
-            FuzzableSplIx::SetAuthority { authority_type, new_authority } => Self::SetAuthority {
+            FuzzTokenIx::InitializeAccount => Self::InitializeAccount,
+            FuzzTokenIx::InitializeMultisig { m } => Self::InitializeMultisig { m: m },
+            FuzzTokenIx::Transfer { amount } => Self::Transfer { amount: amount },
+            FuzzTokenIx::Approve { amount } => Self::Approve { amount: amount },
+            FuzzTokenIx::Revoke => Self::Revoke,
+            FuzzTokenIx::SetAuthority { authority_type, new_authority } => Self::SetAuthority {
                 authority_type: authority_type.into(),
                 new_authority: new_authority.map(|a| a.into()).into(),
             },
-            FuzzableSplIx::MintTo { amount } => Self::MintTo { amount: amount },
-            FuzzableSplIx::Burn { amount } => Self::Burn { amount: amount },
-            FuzzableSplIx::CloseAccount => Self::CloseAccount,
-            FuzzableSplIx::FreezeAccount => Self::FreezeAccount,
-            FuzzableSplIx::ThawAccount => Self::ThawAccount,
-            FuzzableSplIx::TransferChecked { amount, decimals } => {
+            FuzzTokenIx::MintTo { amount } => Self::MintTo { amount: amount },
+            FuzzTokenIx::Burn { amount } => Self::Burn { amount: amount },
+            FuzzTokenIx::CloseAccount => Self::CloseAccount,
+            FuzzTokenIx::FreezeAccount => Self::FreezeAccount,
+            FuzzTokenIx::ThawAccount => Self::ThawAccount,
+            FuzzTokenIx::TransferChecked { amount, decimals } => {
                 Self::TransferChecked { amount: amount, decimals: decimals }
             }
 
-            FuzzableSplIx::ApproveChecked { amount, decimals } => {
+            FuzzTokenIx::ApproveChecked { amount, decimals } => {
                 Self::ApproveChecked { amount: amount, decimals: decimals }
             }
-            FuzzableSplIx::MintToChecked { amount, decimals } => {
+            FuzzTokenIx::MintToChecked { amount, decimals } => {
                 Self::MintToChecked { amount: amount, decimals: decimals }
             }
-            FuzzableSplIx::BurnChecked { amount, decimals } => {
+            FuzzTokenIx::BurnChecked { amount, decimals } => {
                 Self::BurnChecked { amount: amount, decimals: decimals }
             }
-            FuzzableSplIx::InitializeAccount2 { owner } => {
+            FuzzTokenIx::InitializeAccount2 { owner } => {
                 Self::InitializeAccount2 { owner: owner.into() }
             }
-            FuzzableSplIx::SyncNative => Self::SyncNative,
-            FuzzableSplIx::InitializeAccount3 { owner } => {
+            FuzzTokenIx::SyncNative => Self::SyncNative,
+            FuzzTokenIx::InitializeAccount3 { owner } => {
                 Self::InitializeAccount3 { owner: owner.into() }
             }
-            FuzzableSplIx::InitializeMultisig2 { m } => Self::InitializeMultisig2 { m: m },
-            FuzzableSplIx::InitializeMint2 { decimals, mint_authority, freeze_authority } => {
+            FuzzTokenIx::InitializeMultisig2 { m } => Self::InitializeMultisig2 { m: m },
+            FuzzTokenIx::InitializeMint2 { decimals, mint_authority, freeze_authority } => {
                 Self::InitializeMint2 {
                     decimals: decimals,
                     mint_authority: mint_authority.into(),
                     freeze_authority: freeze_authority.map(|a| a.into()).into(),
                 }
             }
-            FuzzableSplIx::GetAccountDataSize => Self::GetAccountDataSize,
-            FuzzableSplIx::InitializeImmutableOwner => Self::InitializeImmutableOwner,
-            FuzzableSplIx::AmountToUiAmount { amount } => Self::AmountToUiAmount { amount: amount },
-            FuzzableSplIx::UiAmountToAmount { ui_amount } => {
+            FuzzTokenIx::GetAccountDataSize => Self::GetAccountDataSize,
+            FuzzTokenIx::InitializeImmutableOwner => Self::InitializeImmutableOwner,
+            FuzzTokenIx::AmountToUiAmount { amount } => Self::AmountToUiAmount { amount: amount },
+            FuzzTokenIx::UiAmountToAmount { ui_amount } => {
                 Self::UiAmountToAmount { ui_amount: ui_amount }
             }
         }
