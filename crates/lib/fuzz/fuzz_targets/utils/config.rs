@@ -1,7 +1,6 @@
 use arbitrary::{Arbitrary, Unstructured};
 use kora_lib::{
-    config,
-    config::EnabledMethods,
+    config::{self, EnabledMethods},
     fee::price::{PriceConfig, PriceModel},
     tests::config_mock::ConfigMockBuilder,
     Config,

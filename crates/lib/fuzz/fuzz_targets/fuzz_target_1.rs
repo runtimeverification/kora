@@ -1,6 +1,6 @@
 #![no_main]
 
-mod util;
+mod utils;
 use arbitrary::{Arbitrary, Unstructured};
 use kora_lib::{
     signer::{KoraSigner, SolanaMemorySigner},
@@ -11,7 +11,7 @@ use kora_lib::{
 use libfuzzer_sys::fuzz_target;
 use solana_sdk::signature::Keypair;
 use std::sync::Arc;
-use util::FuzzConfig;
+use utils::config::FuzzConfig;
 
 fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
