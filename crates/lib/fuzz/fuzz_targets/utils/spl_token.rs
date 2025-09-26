@@ -1,16 +1,6 @@
+use super::common::FuzzPubkey;
 use arbitrary::Arbitrary;
-use solana_sdk::pubkey::Pubkey;
 use spl_token::instruction::{AuthorityType, TokenInstruction};
-
-// TODO: The Arbitrary derive macro isn't good enough here for Pubkey. We need a manual impl that generates keys/selects them from a preset list.
-#[derive(Arbitrary)]
-pub struct FuzzPubKey([u8; 32]);
-
-impl From<FuzzPubKey> for Pubkey {
-    fn from(value: FuzzPubKey) -> Self {
-        Self::new_from_array(value.0)
-    }
-}
 
 #[derive(Arbitrary)]
 pub enum FuzzAuthorityType {
@@ -35,8 +25,8 @@ impl From<FuzzAuthorityType> for AuthorityType {
 pub enum FuzzTokenIx<'a> {
     InitializeMint {
         decimals: u8,
-        mint_authority: FuzzPubKey,
-        freeze_authority: Option<FuzzPubKey>,
+        mint_authority: FuzzPubkey,
+        freeze_authority: Option<FuzzPubkey>,
     },
     InitializeAccount,
     InitializeMultisig {
@@ -51,7 +41,7 @@ pub enum FuzzTokenIx<'a> {
     Revoke,
     SetAuthority {
         authority_type: FuzzAuthorityType,
-        new_authority: Option<FuzzPubKey>,
+        new_authority: Option<FuzzPubkey>,
     },
     MintTo {
         amount: u64,
@@ -79,19 +69,19 @@ pub enum FuzzTokenIx<'a> {
         decimals: u8,
     },
     InitializeAccount2 {
-        owner: FuzzPubKey,
+        owner: FuzzPubkey,
     },
     SyncNative,
     InitializeAccount3 {
-        owner: FuzzPubKey,
+        owner: FuzzPubkey,
     },
     InitializeMultisig2 {
         m: u8,
     },
     InitializeMint2 {
         decimals: u8,
-        mint_authority: FuzzPubKey,
-        freeze_authority: Option<FuzzPubKey>,
+        mint_authority: FuzzPubkey,
+        freeze_authority: Option<FuzzPubkey>,
     },
     GetAccountDataSize,
     InitializeImmutableOwner,
