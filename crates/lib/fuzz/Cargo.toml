@@ -13,6 +13,7 @@ pollster = "0.4.0"
 arbitrary = { workspace = true, features = ["derive"] }
 solana-sdk = { workspace = true }
 spl-token = { workspace = true }
+spl-token-2022 = { workspace = true }
 
 [dependencies.kora-lib]
 path = ".."
