@@ -5,7 +5,7 @@ use spl_token_2022::{
     instruction::{AuthorityType, TokenInstruction},
 };
 
-#[derive(Arbitrary)]
+#[derive(Arbitrary, Clone)]
 pub enum FuzzAuthorityType {
     MintTokens,
     FreezeAccount,
@@ -123,7 +123,7 @@ impl From<&FuzzExtensionType> for ExtensionType {
     }
 }
 
-#[derive(Arbitrary)]
+#[derive(Arbitrary, Clone)]
 pub enum FuzzToken2022Ix<'a> {
     InitializeMint {
         decimals: u8,

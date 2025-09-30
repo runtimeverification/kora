@@ -11,7 +11,7 @@ use kora_lib::{
 use libfuzzer_sys::fuzz_target;
 use solana_sdk::signature::Keypair;
 use std::sync::Arc;
-use utils::config::FuzzConfig;
+use utils::{FuzzConfig, FuzzTransaction};
 
 fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
@@ -20,9 +20,10 @@ fuzz_target!(|data: &[u8]| {
     let config = fuzzconfig.kora_config;
     update_config(config).expect("Couldn't update global config");
 
-    let transaction = create_mock_transaction();
+    let transaction =
+        FuzzTransaction::arbitrary(&mut u).expect("Couldn't generate arbitrary transaction");
 
-    let mut tx = VersionedTransactionResolved::from_kora_built_transaction(&transaction);
+    let mut tx = VersionedTransactionResolved::from_kora_built_transaction(&transaction.build());
     let rpc = RpcMockBuilder::new().build();
 
     let keypair = Keypair::new();
