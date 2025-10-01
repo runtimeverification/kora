@@ -10,7 +10,7 @@ use solana_sdk::{
 use spl_token::instruction::TokenInstruction;
 use spl_token_2022::instruction::TokenInstruction as TokenInstruction2022;
 
-#[derive(Arbitrary, Clone)]
+#[derive(Arbitrary, Clone, Debug)]
 pub enum FuzzInstruction<'a> {
     Legacy(spl_token_fuzz::FuzzTokenIx<'a>),
     Token2022(spl_token_2022_fuzz::FuzzToken2022Ix<'a>),
@@ -31,7 +31,7 @@ impl<'a> From<FuzzInstruction<'a>> for Vec<u8> {
     }
 }
 
-#[derive(Arbitrary)]
+#[derive(Arbitrary, Debug)]
 pub struct FuzzTransaction<'a> {
     instructions: Vec<FuzzInstruction<'a>>,
 }

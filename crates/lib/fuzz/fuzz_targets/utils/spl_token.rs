@@ -2,7 +2,7 @@ use super::common::FuzzPubkey;
 use arbitrary::Arbitrary;
 use spl_token::instruction::{AuthorityType, TokenInstruction};
 
-#[derive(Arbitrary, Clone)]
+#[derive(Arbitrary, Clone, Debug)]
 pub enum FuzzAuthorityType {
     MintTokens,
     FreezeAccount,
@@ -21,7 +21,7 @@ impl From<FuzzAuthorityType> for AuthorityType {
     }
 }
 
-#[derive(Arbitrary, Clone)]
+#[derive(Arbitrary, Clone, Debug)]
 pub enum FuzzTokenIx<'a> {
     InitializeMint {
         decimals: u8,
