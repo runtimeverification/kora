@@ -14,6 +14,7 @@ use litesvm_token;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
 use solana_message::Message;
 use solana_sdk::{
+    instruction::Instruction,
     pubkey::Pubkey,
     signature::Keypair,
     signer::Signer,
@@ -21,48 +22,26 @@ use solana_sdk::{
 };
 use spl_token_2022::instruction::transfer_checked;
 use std::sync::{Arc, LazyLock};
-use utils::LiteSVMSender;
+use utils::{common::InitialState, LiteSVMSender};
 
-static SVM_INIT: LazyLock<LiteSVM> = LazyLock::new(|| LiteSVM::new());
+use crate::utils::spl_token::FuzzSPLInstruction;
+
+static SVM_INIT: LazyLock<InitialState> = LazyLock::new(|| InitialState::new());
 
 fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
 
-    let signer = Keypair::new();
-    let signer_pubkey = signer.pubkey();
-    let alice = Keypair::new();
-    let bob = Keypair::new();
-
-    let mut svm = SVM_INIT.clone();
-    let _ = svm.airdrop(&signer_pubkey, 1_000_000_000);
-    let _ = svm.airdrop(&alice.pubkey(), 1_000_000_000);
-    let _ = svm.airdrop(&bob.pubkey(), 1_000_000_000);
-    let mut mint =
-        litesvm_token::CreateMint::new(&mut svm, &signer).authority(&signer_pubkey).decimals(6);
-    let token_pubkey = mint.send().expect("Couldn't create mint");
-
-    let alice_ata =
-        litesvm_token::CreateAssociatedTokenAccount::new(&mut svm, &signer, &token_pubkey)
-            .owner(&alice.pubkey())
-            .send()
-            .expect("Couldn't create alice ata");
-    let bob_ata =
-        litesvm_token::CreateAssociatedTokenAccount::new(&mut svm, &signer, &token_pubkey)
-            .owner(&bob.pubkey())
-            .send()
-            .expect("Couldn't create bob ata");
-    let signer_ata =
-        litesvm_token::CreateAssociatedTokenAccount::new(&mut svm, &signer, &token_pubkey)
-            .owner(&signer_pubkey)
-            .send()
-            .expect("Couldn't create bob ata");
-
-    litesvm_token::MintTo::new(&mut svm, &signer, &token_pubkey, &alice_ata, 100_000_000)
-        .send()
-        .expect("Couldn't mint to alice");
-    litesvm_token::MintTo::new(&mut svm, &signer, &token_pubkey, &bob_ata, 100_000_000)
-        .send()
-        .expect("Couldn't mint to bob");
+    let InitialState {
+        svm,
+        accounts: [alice, bob, mavory],
+        atas: [alice_ata, bob_ata, mavory_ata],
+        kora_signer,
+        kora_ata: signer_ata,
+        token: token_pubkey,
+        decimals,
+    } = &*SVM_INIT;
+    let svm = svm.clone(); // Very important to clone here for an iteration-specific instance of the vm
+    let signer_pubkey = kora_signer.pubkey();
 
     // Create kora configuration
     let allowed_tokens = vec![token_pubkey.to_string()];
@@ -85,16 +64,22 @@ fuzz_target!(|data: &[u8]| {
         &signer_ata,
         &signer_pubkey,
         &[],
-        8_000_000,
+        u.int_in_range(0..=8_000_000).unwrap(),
         6,
     )
     .expect("Couldn't create token transfer instruction");
-    //let tx = FuzzTransaction::arbitrary(&mut u)
-    //    .expect("Can't build transaction")
-    //    .build(None, Some(vec![payment_ix]));
-    //let mut tx = VersionedTransactionResolved::from_kora_built_transaction(&tx);
 
-    let message = Message::new(&[payment_ix], None);
+    let extra_instrs =
+        u.arbitrary::<Vec<FuzzSPLInstruction>>().expect("Couldn't create extra instructions");
+    let mut more_instrs: Vec<Instruction> = extra_instrs
+        .iter()
+        .map(|instr| {
+            instr.build(&mut u, &token_pubkey, &[alice_ata, bob_ata, signer_ata]).expect("asdf")
+        })
+        .collect();
+    more_instrs.extend_from_slice(&[payment_ix]);
+
+    let message = Message::new(more_instrs.as_slice(), None);
     let transaction = Transaction::new_unsigned(message);
     let vt = VersionedTransaction::from(transaction.clone());
     let mut tx = VersionedTransactionResolved::from_kora_built_transaction(&vt);
@@ -103,23 +88,25 @@ fuzz_target!(|data: &[u8]| {
     let rpc_config = RpcClientConfig::default();
     let rpc = RpcClient::new_sender(sender, rpc_config);
 
-    let signer = Arc::new(KoraSigner::Memory(SolanaMemorySigner::new(signer)));
+    let signer =
+        Arc::new(KoraSigner::Memory(SolanaMemorySigner::new(kora_signer.insecure_clone())));
 
     let res = pollster::block_on(tx.sign_transaction_if_paid(&signer, &rpc));
 
     if let Err(err) = res {
-        println!("Fuzz error");
-        println!("Config: {:?}", config);
-        println!("Pubkeys:");
-        println!("    Bob: {:?}", bob.pubkey());
-        println!("    Bob_ATA: {:?}", bob_ata);
-        println!("    Alice: {:?}", alice.pubkey());
-        println!("    Alice_ATA: {:?}", alice_ata);
-        println!("    Signer: {:?}", signer_pubkey);
-        //println!("Transaction: {:?}", transaction);
-        println!("Error: {:?}", err);
-        assert!(false);
+        let errstring = err.to_string();
+        if !errstring.starts_with("Invalid transaction: Insufficient token payment") {
+            println!("Fuzz error");
+            println!("Config: {:?}", config);
+            println!("Pubkeys:");
+            println!("    Bob: {:?}", bob.pubkey());
+            println!("    Bob_ATA: {:?}", bob_ata);
+            println!("    Alice: {:?}", alice.pubkey());
+            println!("    Alice_ATA: {:?}", alice_ata);
+            println!("    Signer: {:?}", signer_pubkey);
+            //println!("Transaction: {:?}", transaction);
+            println!("{errstring}");
+            assert!(false);
+        }
     }
-
-    drop(rpc);
 });
