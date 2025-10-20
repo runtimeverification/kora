@@ -11,13 +11,16 @@ cargo-fuzz = true
 arbitrary = { workspace = true, features = ["derive"] }
 async-trait = { workspace = true }
 libfuzzer-sys = "0.4"
-litesvm = "0.8.0"
 pollster = "0.4.0"
 serde_json = { workspace = true }
 solana-client = { workspace = true }
+solana-message = { workspace = true }
 solana-sdk = { workspace = true }
 spl-token-2022 = { workspace = true }
 spl-token = { workspace = true }
+litesvm = "0.7.0"
+litesvm-token = "0.7.0"
+solana-account-decoder = "2.3.13"
 
 [dependencies.kora-lib]
 path = ".."
