@@ -1,7 +1,7 @@
 use arbitrary::{Arbitrary, Result, Unstructured};
 use kora_lib::state::get_config;
 use litesvm::LiteSVM;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer};
 use std::{str::FromStr, sync::LazyLock};
 
 static FUZZ_KEYS: LazyLock<Vec<Pubkey>> = LazyLock::new(|| {
@@ -117,4 +117,14 @@ impl From<FuzzPubkey> for Pubkey {
     fn from(value: FuzzPubkey) -> Self {
         value.0
     }
+}
+
+pub trait BuildableInstruction {
+    fn build(
+        &self,
+        u: &mut Unstructured,
+        token: &Pubkey,
+        accounts: &[&Pubkey],
+        atas: &[&Pubkey],
+    ) -> Result<Instruction>;
 }

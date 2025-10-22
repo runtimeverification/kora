@@ -22,7 +22,10 @@ use solana_sdk::{
 };
 use spl_token_2022::instruction::transfer_checked;
 use std::sync::{Arc, LazyLock};
-use utils::{common::InitialState, LiteSVMSender};
+use utils::{
+    common::{BuildableInstruction, InitialState},
+    FuzzInstruction, LiteSVMSender,
+};
 
 use crate::utils::spl_token::FuzzSPLInstruction;
 
@@ -40,8 +43,10 @@ fuzz_target!(|data: &[u8]| {
         token: token_pubkey,
         decimals,
     } = &*SVM_INIT;
-    let svm = svm.clone(); // Very important to clone here for an iteration-specific instance of the vm
+    let svm = (*svm).clone(); // Very important to clone here for an iteration-specific instance of the vm
     let signer_pubkey = kora_signer.pubkey();
+    let accounts = [&alice.pubkey(), &bob.pubkey(), &mavory.pubkey(), &signer_pubkey];
+    let atas = [alice_ata, bob_ata, mavory_ata, signer_ata];
 
     // Create kora configuration
     let allowed_tokens = vec![token_pubkey.to_string()];
@@ -64,17 +69,18 @@ fuzz_target!(|data: &[u8]| {
         &signer_ata,
         &signer_pubkey,
         &[],
-        u.int_in_range(0..=8_000_000).unwrap(),
+        //u.int_in_range(0..=8_000_000).unwrap(),
+        5000,
         6,
     )
     .expect("Couldn't create token transfer instruction");
 
     let extra_instrs =
-        u.arbitrary::<Vec<FuzzSPLInstruction>>().expect("Couldn't create extra instructions");
+        u.arbitrary::<Vec<FuzzInstruction>>().expect("Couldn't create extra instructions");
     let mut more_instrs: Vec<Instruction> = extra_instrs
         .iter()
         .map(|instr| {
-            instr.build(&mut u, &token_pubkey, &[alice_ata, bob_ata, signer_ata]).expect("asdf")
+            instr.build(&mut u, &token_pubkey, accounts.as_slice(), atas.as_slice()).expect("asdf")
         })
         .collect();
     more_instrs.extend_from_slice(&[payment_ix]);

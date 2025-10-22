@@ -1,4 +1,4 @@
-use super::common::FuzzPubkey;
+use super::common::BuildableInstruction;
 use arbitrary::{Arbitrary, Error, Result, Unstructured};
 use solana_sdk::{instruction::Instruction, program_error::ProgramError, pubkey::Pubkey};
 use spl_token::{
@@ -13,11 +13,12 @@ pub enum FuzzSPLInstruction {
     Burn,
 }
 
-impl FuzzSPLInstruction {
-    pub fn build(
+impl BuildableInstruction for FuzzSPLInstruction {
+    fn build(
         &self,
         u: &mut Unstructured,
         token: &Pubkey,
+        accounts: &[&Pubkey],
         atas: &[&Pubkey],
     ) -> Result<Instruction> {
         match self {
