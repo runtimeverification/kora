@@ -3,6 +3,7 @@
 mod utils;
 use arbitrary::Unstructured;
 use kora_lib::{
+    config::FeePayerPolicy,
     signer::{KoraSigner, SolanaMemorySigner},
     state::{get_config, update_config},
     tests::config_mock::ConfigMockBuilder,
@@ -27,7 +28,7 @@ use utils::{
     FuzzInstruction, LiteSVMSender,
 };
 
-use crate::utils::spl_token::FuzzSPLInstruction;
+use crate::utils::{spl_token::FuzzSPLInstruction, spl_token_2022::FuzzSPL2022Instruction};
 
 static SVM_INIT: LazyLock<InitialState> = LazyLock::new(|| InitialState::new());
 
@@ -55,10 +56,19 @@ fuzz_target!(|data: &[u8]| {
         .with_allowed_tokens(allowed_tokens.clone())
         .with_allowed_spl_paid_tokens(kora_lib::config::SplTokenConfig::Allowlist(allowed_tokens))
         .with_payment_address(Some(signer_pubkey.to_string()))
+        .with_allowed_programs(vec![
+            "11111111111111111111111111111111".parse().unwrap(), // System Program
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse().unwrap(), // Token Program
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb".parse().unwrap(), // Token-2022 Program
+            "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL".parse().unwrap(), // ATA Program
+        ])
+        .with_fee_payer_policy(FeePayerPolicy {
+            allow_token2022_transfers: false,
+            ..Default::default()
+        })
         .build();
 
     update_config(fuzzconfig).expect("Couldn't update global config");
-    let config = get_config().expect("could not retrieve global config");
 
     let token_pgm: Pubkey = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse().unwrap(); // Token Program
 
@@ -69,23 +79,42 @@ fuzz_target!(|data: &[u8]| {
         &signer_ata,
         &signer_pubkey,
         &[],
-        //u.int_in_range(0..=8_000_000).unwrap(),
         5000,
         6,
     )
     .expect("Couldn't create token transfer instruction");
 
-    let extra_instrs =
-        u.arbitrary::<Vec<FuzzInstruction>>().expect("Couldn't create extra instructions");
-    let mut more_instrs: Vec<Instruction> = extra_instrs
+    //let token2022transfer = FuzzSPL2022Instruction::Transfer.build(&mut u, token_pubkey, accounts.as_slice(), atas.as_slice()).unwrap();
+    //let token2022transfer = spl_token_2022::instruction::transfer_checked(&spl_token_2022::id(), bob_ata, &signer_pubkey, token_pubkey, &[], 5000, decimals).unwrap();
+    let token2022transfer = spl_token_2022::instruction::transfer_checked(
+        &spl_token_2022::id(),
+        bob_ata,
+        token_pubkey,
+        signer_ata,
+        &signer_pubkey,
+        &[],
+        5000,
+        *decimals,
+    )
+    .unwrap();
+    let n = u.int_in_range(0..=20).unwrap();
+    let extra_instrs: Vec<FuzzInstruction> =
+        u.arbitrary_iter::<FuzzInstruction>().unwrap().take(n).map(|i| i.unwrap()).collect();
+    let extra_instrs: Vec<Instruction> = extra_instrs
         .iter()
         .map(|instr| {
-            instr.build(&mut u, &token_pubkey, accounts.as_slice(), atas.as_slice()).expect("asdf")
+            instr.build(&mut u, token_pubkey, accounts.as_slice(), atas.as_slice()).unwrap()
         })
         .collect();
-    more_instrs.extend_from_slice(&[payment_ix]);
+    let mut all_instrs: Vec<Instruction> =
+        [&[token2022transfer, payment_ix], extra_instrs.as_slice()].concat();
+    let all_instrs: &mut [Instruction] = all_instrs.as_mut_slice();
+    for i in (1..all_instrs.len()).rev() {
+        let j = u.int_in_range(0..=i).unwrap();
+        all_instrs.swap(i, j);
+    }
 
-    let message = Message::new(more_instrs.as_slice(), None);
+    let message = Message::new(all_instrs, None);
     let transaction = Transaction::new_unsigned(message);
     let vt = VersionedTransaction::from(transaction.clone());
     let mut tx = VersionedTransactionResolved::from_kora_built_transaction(&vt);
@@ -99,20 +128,11 @@ fuzz_target!(|data: &[u8]| {
 
     let res = pollster::block_on(tx.sign_transaction_if_paid(&signer, &rpc));
 
-    if let Err(err) = res {
-        let errstring = err.to_string();
-        if !errstring.starts_with("Invalid transaction: Insufficient token payment") {
-            println!("Fuzz error");
-            println!("Config: {:?}", config);
-            println!("Pubkeys:");
-            println!("    Bob: {:?}", bob.pubkey());
-            println!("    Bob_ATA: {:?}", bob_ata);
-            println!("    Alice: {:?}", alice.pubkey());
-            println!("    Alice_ATA: {:?}", alice_ata);
-            println!("    Signer: {:?}", signer_pubkey);
-            //println!("Transaction: {:?}", transaction);
-            println!("{errstring}");
-            assert!(false);
-        }
+    if let Ok(res) = res {
+        println!("Fuzz error");
+        println!("System instructions: {:?}", tx.get_or_parse_system_instructions());
+        println!("SPL instructions: {:?}", tx.get_or_parse_spl_instructions());
+        println!("Transaction: {:?}", tx.clone());
+        assert!(false);
     }
 });
