@@ -16,11 +16,13 @@ serde_json = { workspace = true }
 solana-client = { workspace = true }
 solana-message = { workspace = true }
 solana-sdk = { workspace = true }
+solana-transaction-status-client-types = { workspace = true }
 spl-token-2022 = { workspace = true }
 spl-token = { workspace = true }
 litesvm = "0.7.0"
 litesvm-token = "0.7.0"
 solana-account-decoder = "2.3.13"
+base64 = { workspace = true }
 
 [dependencies.kora-lib]
 path = ".."
