@@ -22,8 +22,8 @@ impl common::BuildableInstruction for FuzzInstruction {
         &self,
         u: &mut arbitrary::Unstructured,
         token: &solana_sdk::pubkey::Pubkey,
-        accounts: &[&solana_sdk::pubkey::Pubkey],
-        atas: &[&solana_sdk::pubkey::Pubkey],
+        accounts: &[solana_sdk::pubkey::Pubkey],
+        atas: &[solana_sdk::pubkey::Pubkey],
     ) -> arbitrary::Result<solana_sdk::instruction::Instruction> {
         match self {
             Self::SPLToken(i) => i.build(u, token, accounts, atas),

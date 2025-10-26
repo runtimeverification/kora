@@ -12,8 +12,8 @@ impl BuildableInstruction for FuzzSystemInstruction {
         &self,
         u: &mut Unstructured,
         token: &Pubkey,
-        accounts: &[&Pubkey],
-        atas: &[&Pubkey],
+        accounts: &[Pubkey],
+        atas: &[Pubkey],
     ) -> Result<Instruction> {
         let instruction = match self {
             Self::Transfer => {

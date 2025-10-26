@@ -19,28 +19,32 @@ impl BuildableInstruction for FuzzSPL2022Instruction {
         &self,
         u: &mut Unstructured,
         token: &Pubkey,
-        accounts: &[&Pubkey],
-        atas: &[&Pubkey],
+        accounts: &[Pubkey],
+        atas: &[Pubkey],
     ) -> Result<Instruction> {
         match self {
             Self::Transfer => {
-                let source = u.choose(atas)?;
+                let source_index = u.int_in_range(1..=accounts.len())? - 1;
+                let source = atas[source_index];
+                let authority = accounts[source_index];
                 let destination = u.choose(atas)?;
                 let amount = u.int_in_range(0..=1_000_000)?;
-                transfer(&id(), source, destination, token, &[], amount)
+                transfer(&id(), &source, destination, &authority, &[], amount)
             }
             Self::Approve => {
-                let source = u.choose(atas)?;
+                let source_index = u.int_in_range(1..=accounts.len())? - 1;
+                let source = atas[source_index];
+                let owner = accounts[source_index];
                 let delegate = u.choose(atas)?;
-                let owner = u.choose(atas)?;
                 let amount = u.int_in_range(0..=1_000_000)?;
-                approve(&id(), source, delegate, owner, &[], amount)
+                approve(&id(), &source, delegate, &owner, &[], amount)
             }
             Self::Burn => {
-                let account = u.choose(atas)?;
-                let authority = u.choose(atas)?;
+                let source_index = u.int_in_range(1..=accounts.len())? - 1;
+                let account = atas[source_index];
+                let owner = accounts[source_index];
                 let amount = u.int_in_range(0..=1_000_000)?;
-                burn(&id(), account, token, authority, &[], amount)
+                burn(&id(), &account, token, &owner, &[], amount)
             }
         }
         .map_err(|_| Error::IncorrectFormat)
