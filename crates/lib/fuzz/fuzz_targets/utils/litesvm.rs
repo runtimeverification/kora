@@ -17,8 +17,6 @@ use solana_client::{
 use solana_sdk::{
     account::{Account, AccountSharedData},
     pubkey::Pubkey,
-    transaction::{TransactionError, VersionedTransaction},
-    transaction_context::TransactionReturnData,
 };
 use solana_transaction_status_client_types::{
     InnerInstruction, InnerInstructions, UiInnerInstructions,

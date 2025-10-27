@@ -1,5 +1,5 @@
 use super::common::BuildableInstruction;
-use arbitrary::{Arbitrary, Error, Result, Unstructured};
+use arbitrary::{Arbitrary, Result, Unstructured};
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, system_instruction::transfer};
 
 #[derive(Arbitrary, Clone, Debug)]

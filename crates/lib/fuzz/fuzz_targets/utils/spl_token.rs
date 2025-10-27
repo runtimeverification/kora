@@ -1,9 +1,9 @@
 use super::common::BuildableInstruction;
 use arbitrary::{Arbitrary, Error, Result, Unstructured};
-use solana_sdk::{instruction::Instruction, program_error::ProgramError, pubkey::Pubkey};
+use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 use spl_token::{
     id,
-    instruction::{approve, burn, transfer, AuthorityType, TokenInstruction},
+    instruction::{approve, burn, transfer},
 };
 
 #[derive(Arbitrary, Clone, Debug)]

@@ -6,20 +6,16 @@ use kora_lib::{
     config::FeePayerPolicy,
     rpc_server::{method::sign_transaction_if_paid::SignTransactionIfPaidRequest, KoraRpc},
     signer::{KoraSigner, SignerPool, SignerWithMetadata, SolanaMemorySigner},
-    state::{get_config, update_config, update_signer_pool},
+    state::{update_config, update_signer_pool},
     tests::config_mock::ConfigMockBuilder,
     transaction::{VersionedTransactionOps, VersionedTransactionResolved},
     usage_limit::UsageTracker,
 };
 use libfuzzer_sys::fuzz_target;
-use litesvm::LiteSVM;
-use litesvm_token;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
 use solana_message::Message;
 use solana_sdk::{
     instruction::Instruction,
-    pubkey::Pubkey,
-    signature::Keypair,
     signer::Signer,
     transaction::{Transaction, VersionedTransaction},
 };
@@ -30,34 +26,23 @@ use utils::{
     FuzzInstruction, LiteSVMSender,
 };
 
-use crate::utils::{common::TokenMetadata, spl_token::FuzzSPLInstruction, spl_token_2022::FuzzSPL2022Instruction};
+use crate::utils::common::TokenMetadata;
 
 static SVM_INIT: LazyLock<InitialState> = LazyLock::new(|| InitialState::new());
 
 fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
 
-    let InitialState {
-        svm,
-        spl_metadata,
-        accounts: accounts @ [kora, alice, bob, mavory],
-        atas: [alice_ata, bob_ata, mavory_ata],
-        kora_signer,
-        kora_ata: signer_ata,
-        token: token_pubkey,
-        decimals,
-    } = &*SVM_INIT;
+    let InitialState { svm, spl_metadata, accounts, kora_signer } = &*SVM_INIT;
     let svm = (*svm).clone(); // Very important to clone here for an iteration-specific instance of the vm
-    let signer_pubkey = kora_signer.pubkey();
-    let atas = [alice_ata, bob_ata, mavory_ata, signer_ata];
 
     // Create kora configuration
-    let allowed_tokens = vec![token_pubkey.to_string()];
+    let allowed_tokens = vec![spl_metadata.mint_pubkey.to_string()];
     let fuzzconfig = ConfigMockBuilder::new()
         .with_cache_enabled(false)
         .with_allowed_tokens(allowed_tokens.clone())
         .with_allowed_spl_paid_tokens(kora_lib::config::SplTokenConfig::Allowlist(allowed_tokens))
-        .with_payment_address(Some(signer_pubkey.to_string()))
+        .with_payment_address(Some(kora_signer.pubkey().to_string()))
         .with_allowed_programs(vec![
             "11111111111111111111111111111111".parse().unwrap(), // System Program
             "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse().unwrap(), // Token Program
@@ -78,14 +63,9 @@ fuzz_target!(|data: &[u8]| {
     update_signer_pool(pool).unwrap();
     let _ = pollster::block_on(UsageTracker::init_usage_limiter());
 
-    let TokenMetadata {
-        program,
-        mint_pubkey,
-        decimals,
-        atas,
-        ..
-    } = spl_metadata;
+    let TokenMetadata { program, mint_pubkey, decimals, atas, .. } = spl_metadata;
 
+    // Create a payment instruction
     let payment_ix = transfer_checked(
         &program,
         &atas[2],
@@ -96,29 +76,36 @@ fuzz_target!(|data: &[u8]| {
         5000,
         *decimals,
     )
-    .expect("Couldn't create token transfer instruction");
+    .unwrap();
 
+    // Create extra arbitrary instructions
     let n = u.int_in_range(0..=20).unwrap();
     let extra_instrs: Vec<FuzzInstruction> =
         u.arbitrary_iter::<FuzzInstruction>().unwrap().take(n).map(|i| i.unwrap()).collect();
     let extra_instrs: Vec<Instruction> = extra_instrs
         .iter()
         .map(|instr| {
-            instr.build(&mut u, token_pubkey, accounts.as_slice(), atas.as_slice()).unwrap()
+            instr.build(&mut u, mint_pubkey, accounts.as_slice(), atas.as_slice()).unwrap()
         })
         .collect();
-    let mut all_instrs: Vec<Instruction> =
-        [&[payment_ix], extra_instrs.as_slice()].concat();
+
+    // Shuffle all of the instructions around
+    let mut all_instrs: Vec<Instruction> = [&[payment_ix], extra_instrs.as_slice()].concat();
     let all_instrs: &mut [Instruction] = all_instrs.as_mut_slice();
     for i in (1..all_instrs.len()).rev() {
         let j = u.int_in_range(0..=i).unwrap();
         all_instrs.swap(i, j);
     }
 
-    let message = Message::new_with_blockhash(all_instrs, Some(&kora_signer.pubkey()), &svm.latest_blockhash());
+    // Build a transaction with the instructions
+    let message = Message::new_with_blockhash(
+        all_instrs,
+        Some(&kora_signer.pubkey()),
+        &svm.latest_blockhash(),
+    );
     let transaction = Transaction::new_unsigned(message);
     let vt = VersionedTransaction::from(transaction.clone());
-    let mut tx = VersionedTransactionResolved::from_kora_built_transaction(&vt);
+    let tx = VersionedTransactionResolved::from_kora_built_transaction(&vt);
 
     let sender = LiteSVMSender(svm);
     let rpc_config = RpcClientConfig::default();
@@ -126,6 +113,10 @@ fuzz_target!(|data: &[u8]| {
 
     let rpc = KoraRpc::new(Arc::new(rpc_client));
 
-    let request = SignTransactionIfPaidRequest { transaction: tx.encode_b64_transaction().unwrap(), signer_key: None, sig_verify: false };
+    let request = SignTransactionIfPaidRequest {
+        transaction: tx.encode_b64_transaction().unwrap(),
+        signer_key: None,
+        sig_verify: false,
+    };
     let _res = pollster::block_on(rpc.sign_transaction_if_paid(request));
 });
