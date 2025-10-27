@@ -14,7 +14,7 @@ use arbitrary::Arbitrary;
 pub enum FuzzInstruction {
     System(system_interface::FuzzSystemInstruction),
     SPLToken(spl_token::FuzzSPLInstruction),
-    SPLToken2022(spl_token_2022::FuzzSPL2022Instruction),
+    //SPLToken2022(spl_token_2022::FuzzSPL2022Instruction),
 }
 
 impl common::BuildableInstruction for FuzzInstruction {
@@ -27,7 +27,7 @@ impl common::BuildableInstruction for FuzzInstruction {
     ) -> arbitrary::Result<solana_sdk::instruction::Instruction> {
         match self {
             Self::SPLToken(i) => i.build(u, token, accounts, atas),
-            Self::SPLToken2022(i) => i.build(u, token, accounts, atas),
+            //Self::SPLToken2022(i) => i.build(u, token, accounts, atas),
             Self::System(i) => i.build(u, token, accounts, atas),
         }
     }
