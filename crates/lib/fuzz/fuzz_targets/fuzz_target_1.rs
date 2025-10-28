@@ -85,7 +85,7 @@ fuzz_target!(|data: &[u8]| {
     let extra_instrs: Vec<Instruction> = extra_instrs
         .iter()
         .map(|instr| {
-            instr.build(&mut u, mint_pubkey, accounts.as_slice(), atas.as_slice()).unwrap()
+            instr.build(&mut u, *spl_metadata, *spl_2022_metadata, accounts.as_slice()).unwrap()
         })
         .collect();
 
