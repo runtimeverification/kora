@@ -1,3 +1,5 @@
+use crate::utils::common::TokenMetadata;
+
 use super::common::BuildableInstruction;
 use arbitrary::{Arbitrary, Result, Unstructured};
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, system_instruction::transfer};
@@ -11,9 +13,9 @@ impl BuildableInstruction for FuzzSystemInstruction {
     fn build(
         &self,
         u: &mut Unstructured,
-        token: &Pubkey,
+        _spl_meta: TokenMetadata,
+        _spl_2022_meta: TokenMetadata,
         accounts: &[Pubkey],
-        atas: &[Pubkey],
     ) -> Result<Instruction> {
         let instruction = match self {
             Self::Transfer => {

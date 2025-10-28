@@ -9,7 +9,7 @@ use spl_token_2022::id as spl_2022_id;
 
 pub const NUM_ACCOUNTS: usize = 4;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct TokenMetadata {
     pub program: Pubkey,
     pub mint_pubkey: Pubkey,
@@ -178,8 +178,8 @@ pub trait BuildableInstruction {
     fn build(
         &self,
         u: &mut Unstructured,
-        token: &Pubkey,
+        spl_meta: TokenMetadata,
+        spl_2022_meta: TokenMetadata,
         accounts: &[Pubkey],
-        atas: &[Pubkey],
     ) -> Result<Instruction>;
 }

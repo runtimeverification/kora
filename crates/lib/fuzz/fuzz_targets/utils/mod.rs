@@ -10,6 +10,8 @@ pub use litesvm::LiteSVMSender;
 
 use arbitrary::Arbitrary;
 
+use crate::utils::common::TokenMetadata;
+
 #[derive(Arbitrary, Clone, Debug)]
 pub enum FuzzInstruction {
     System(system_interface::FuzzSystemInstruction),
@@ -21,14 +23,14 @@ impl common::BuildableInstruction for FuzzInstruction {
     fn build(
         &self,
         u: &mut arbitrary::Unstructured,
-        token: &solana_sdk::pubkey::Pubkey,
+        spl_meta: TokenMetadata,
+        spl_2022_meta: TokenMetadata,
         accounts: &[solana_sdk::pubkey::Pubkey],
-        atas: &[solana_sdk::pubkey::Pubkey],
     ) -> arbitrary::Result<solana_sdk::instruction::Instruction> {
         match self {
-            Self::SPLToken(i) => i.build(u, token, accounts, atas),
+            Self::SPLToken(i) => i.build(u, spl_meta, spl_2022_meta, accounts),
             //Self::SPLToken2022(i) => i.build(u, token, accounts, atas),
-            Self::System(i) => i.build(u, token, accounts, atas),
+            Self::System(i) => i.build(u, spl_meta, spl_2022_meta, accounts),
         }
     }
 }
