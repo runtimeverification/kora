@@ -99,6 +99,21 @@ impl RpcSender for LiteSVMSender {
                 }
             }
             "getFeeForMessage" => json!(5000 as u64),
+            "getEpochInfo" => {
+                let clock: Clock = self.0.get_sysvar::<Clock>();
+                let slot = clock.slot;
+                let epoch = clock.epoch;
+                json!({
+                    "result": {
+                        "absoluteSlot": slot,
+                        "blockHeight": 166500, // Fake number
+                        "epoch": epoch,
+                        "slotIndex": 2790, // Fake number
+                        "slotsInEpoch": 8192, // Fake number
+                        "transactionCount": 22661093 // Fake number
+                    },
+                })
+            }
             _ => todo!("unsupported method, {}, {}", method, param_str),
         };
         Ok(json!(Response {

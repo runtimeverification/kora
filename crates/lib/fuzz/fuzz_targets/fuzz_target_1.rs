@@ -78,6 +78,19 @@ fuzz_target!(|data: &[u8]| {
     )
     .unwrap();
 
+    let TokenMetadata { program, mint_pubkey, decimals, atas, .. } = spl_2022_metadata;
+    let payment_2022_ix = spl_token_2022::instruction::transfer_checked(
+        &program,
+        &atas[2],
+        &mint_pubkey,
+        &atas[0],
+        &accounts[2],
+        &[],
+        5000,
+        *decimals,
+    )
+    .unwrap();
+
     // Create extra arbitrary instructions
     let n = u.int_in_range(0..=20).unwrap();
     let extra_instrs: Vec<FuzzInstruction> =
@@ -90,7 +103,8 @@ fuzz_target!(|data: &[u8]| {
         .collect();
 
     // Shuffle all of the instructions around
-    let mut all_instrs: Vec<Instruction> = [&[payment_ix], extra_instrs.as_slice()].concat();
+    let mut all_instrs: Vec<Instruction> =
+        [&[payment_ix, payment_2022_ix], extra_instrs.as_slice()].concat();
     let all_instrs: &mut [Instruction] = all_instrs.as_mut_slice();
     for i in (1..all_instrs.len()).rev() {
         let j = u.int_in_range(0..=i).unwrap();
@@ -118,5 +132,9 @@ fuzz_target!(|data: &[u8]| {
         signer_key: None,
         sig_verify: false,
     };
-    let _res = pollster::block_on(rpc.sign_transaction_if_paid(request));
+    let res = pollster::block_on(rpc.sign_transaction_if_paid(request));
+
+    if let Ok(res) = res {
+        panic!();
+    }
 });
