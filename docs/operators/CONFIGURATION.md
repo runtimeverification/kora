@@ -1,5 +1,5 @@
 # Kora Configuration Reference
-*Last Updated: 2025-08-25*
+*Last Updated: 2025-10-28*
 
 Your Kora node will be signing transactions for your users, so it is important to configure it to only sign transactions that meet your business requirements. Kora gives you a lot of flexibility in how you configure your node, but it is important to understand the implications of your configuration. `kora.toml` is the control center for your Kora configuration. This document provides a comprehensive reference for configuring your Kora paymaster node through the `kora.toml` configuration file.
 
@@ -25,6 +25,7 @@ The `kora.toml` file is organized into sections, each with its own set of option
 - [Kora Core Policies](#kora-core-policies) - Core server settings
 - [Kora Authentication](#kora-authentication) - Authentication settings
 - [Kora Caching](#kora-caching-optional) - Redis caching for RPC calls
+- [Kora Usage Limits](#kora-usage-limits-optional) - Per-wallet transaction limiting
 - [Kora Enabled Methods](#kora-enabled-methods-optional) - Kora RPC methods to enable
 - [Validation Policies](#validation-policies) - Transaction validation and security
 - [Token-2022 Extension Blocking](#token-2022-extension-blocking) - Block risky Token-2022 extensions
@@ -44,6 +45,9 @@ Sample `kora.toml` file sections:
 
 [kora.cache]
 # Redis caching configuration
+
+[kora.usage_limit]
+# Per-wallet transaction limiting
 
 [kora.enabled_methods]
 # Kora RPC methods to enable
@@ -122,6 +126,31 @@ account_ttl = 60                    # Account data TTL in seconds (1 minute)
 
 > *Note: When caching is enabled, a Redis instance must be available at the specified URL. The cache gracefully falls back to direct RPC calls if Redis is unavailable.*
 
+## Kora Usage Limits (optional)
+
+The `[kora.usage_limit]` section configures per-wallet transaction limiting to prevent abuse and ensure fair usage across your users. This could also be used to create rewards programs to subsidize users' transaction fees up to a certain limit. 
+
+**Important**: Currently, the only form of usage limiting supported by Kora is a **permanent limit**. Once a wallet reaches its transaction limit, it cannot be reset and the user will no longer be able to submit any more transactions using that same wallet. This limit persists until manually cleared from Redis or the Redis data is reset.
+
+**Note**: This feature requires Redis when enabled across multiple Kora instances:
+
+```toml
+[kora.usage_limit]
+enabled = true                      # Enable/disable usage limiting
+cache_url = "redis://localhost:6379" # Redis URL for shared state (required when enabled)
+max_transactions = 100              # Max transactions per wallet (0 = unlimited)
+fallback_if_unavailable = true      # Continue if Redis is unavailable
+```
+
+| Option | Description | Required | Type |
+|--------|-------------|---------|---------|
+| `enabled` | Enable per-wallet transaction limiting | ❌ (default: false) | boolean |
+| `cache_url` | Redis connection URL for shared usage tracking | ❌ | string |
+| `max_transactions` | Maximum transactions per wallet (0 = unlimited) | ❌ (default: 100) | number |
+| `fallback_if_unavailable` | Allow transactions if Redis is unavailable | ❌ (default: true) | boolean |
+
+> *Note: Usage limits are tracked per wallet address with automatic TTL-based expiration. When `fallback_if_unavailable` is true, the system allows transactions to proceed if Redis is temporarily unavailable, preventing service disruption. Setting `max_transactions` to 0 will allow unlimited transactions.*
+
 ### Kora Enabled Methods (optional)
 The `[kora.enabled_methods]` section controls which RPC methods are enabled. This section is optional and by default, all methods are enabled. Each method can be enabled or disabled by setting the value to `true` or `false`:
 
@@ -135,7 +164,6 @@ sign_and_send_transaction = false
 transfer_transaction = false
 get_blockhash = true
 get_config = true
-sign_transaction_if_paid = true
 get_payer_signer = true
 ```
 
@@ -149,7 +177,6 @@ get_payer_signer = true
 | `transfer_transaction` | Handle token transfers | ✅ | boolean |
 | `get_blockhash` | Get a recent blockhash | ✅ | boolean |
 | `get_config` | Return the Kora server config | ✅ | boolean |
-| `sign_transaction_if_paid` | Conditional signing if token payment instruction is provided | ✅ | boolean |
 
 
 > *Note: if this section is included in your `kora.toml` file, all methods must explicitly be set to `true` or `false`.*
@@ -242,6 +269,11 @@ blocked_account_extensions = [
 
 > *Note: Blocking extensions helps prevent interactions with tokens that have complex or potentially risky behaviors. For example, blocking `transfer_hook` prevents signing transactions for tokens with custom transfer logic.*
 
+### Security Considerations
+
+**PermanentDelegate Extension** - Tokens with this extension allow the delegate to transfer/burn tokens at any time without owner approval. This creates significant risks for the Kora node operator as payment funds can be seized after payment. 
+- Consider adding "permanent_delegate" to `blocked_mint_extensions` in [validation.token2022] unless explicitly needed for your use case.
+- Avoid using payment tokens with the `permanent_delegate` extension.
 
 ## Fee Payer Policy
 
@@ -269,7 +301,10 @@ allow_approve = false
 | `allow_close_account` | Allow closing token accounts where the Kora node's fee payer is the signer/authority | ✅ | boolean |
 | `allow_approve` | Allow token delegation/approval where the Kora node's fee payer is the signer/authority | ✅ | boolean |
 
-> *Note: For security reasons, it is recommended to set all of these to `false` and only enable as needed.*
+
+### Security Considerations
+
+**SECURITY WARNING:** For security reasons, it is recommended to set all of these to `false` and only enable as needed. This will prevent unwanted behavior such as users draining your fee payer account or burning tokens from your fee payer account.
 
 ## Price Configuration (optional)
 
@@ -297,6 +332,8 @@ margin = 0.1  # 10% margin (0.1 = 10%, 1.0 = 100%)
 
 ### Fixed Pricing
 
+**SECURITY WARNING:** Fixed pricing does **NOT** include fee payer outflow in the charged amount. This can allow users to drain your fee payer account if not properly configured.
+
 Charge a fixed amount in a specific token regardless of network fees:
 
 ```toml
@@ -305,7 +342,7 @@ type = "fixed"
 amount = 1000000  # Amount in token's base units
 token = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  # USDC mint
 ```
-
+   
 ### Free Transactions
 
 Sponsor all transaction fees (no charge to users):
@@ -314,6 +351,35 @@ Sponsor all transaction fees (no charge to users):
 [validation.price]
 type = "free"
 ```
+
+#### Security Measures When Using Fixed/Free Pricing
+
+1. **Disable Transfer Operations** - Prevent fee payer from being used as source in transfers:
+   ```toml
+   [validation.fee_payer_policy.system]
+   allow_transfer = false              # Critical: Block SOL transfers
+   allow_create_account = false        # Block account creation
+
+   [validation.fee_payer_policy.spl_token]
+   allow_transfer = false              # Block SPL transfers
+
+   [validation.fee_payer_policy.token_2022]
+   allow_transfer = false              # Block Token2022 transfers
+   ```
+
+2. **Enable Authentication** - Use authentication to prevent abuse:
+   ```toml
+   [kora.auth]
+   api_key = "your-secure-api-key"
+   # or
+   hmac_secret = "your-minimum-32-character-hmac-secret"
+   ```
+
+3. **Set Conservative Limits** - Minimize exposure:
+   ```toml
+   [validation]
+   max_allowed_lamports = 1000000  # 0.001 SOL maximum
+   ```
 
 ## Performance Monitoring (optional)
 
@@ -381,6 +447,13 @@ url = "redis://localhost:6379"
 default_ttl = 300  # 5 minutes
 account_ttl = 60   # 1 minute
 
+# Usage limiting (optional, prevents abuse)
+[kora.usage_limit]
+enabled = true
+cache_url = "redis://localhost:6379"  # Can share same Redis instance as cache
+max_transactions = 100                # Per-wallet limit
+fallback_if_unavailable = true        # Don't block if Redis is down
+
 # Disable unnecessary RPC methods for security
 [kora.enabled_methods]
 liveness = true
@@ -391,7 +464,6 @@ sign_and_send_transaction = false
 transfer_transaction = false
 get_blockhash = true
 get_config = true
-sign_transaction_if_paid = true
 get_payer_signer = true
 
 [validation]
