@@ -34,3 +34,10 @@ path = "fuzz_targets/fuzz_target_1.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "random_bytes"
+path = "fuzz_targets/random_bytes.rs"
+test = false
+doc = false
+bench = false
