@@ -2,7 +2,8 @@ use crate::utils::common::TokenMetadata;
 
 use super::common::BuildableInstruction;
 use arbitrary::{Arbitrary, Result, Unstructured};
-use solana_sdk::{instruction::Instruction, pubkey::Pubkey, system_instruction::transfer};
+use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
+use solana_system_interface::instruction::transfer;
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum FuzzSystemInstruction {

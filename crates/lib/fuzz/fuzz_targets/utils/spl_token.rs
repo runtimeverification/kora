@@ -1,7 +1,7 @@
 use super::common::{BuildableInstruction, TokenMetadata};
 use arbitrary::{Arbitrary, Error, Result, Unstructured};
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-use spl_token::instruction::{approve, burn, transfer};
+use spl_token_interface::instruction::{approve, burn, transfer};
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum FuzzSPLInstruction {

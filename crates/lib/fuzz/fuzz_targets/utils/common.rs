@@ -4,8 +4,8 @@ use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
     transaction::Transaction,
 };
-use spl_token::id as spl_id;
-use spl_token_2022::id as spl_2022_id;
+use spl_token_interface::id as spl_id;
+use spl_token_2022_interface::id as spl_2022_id;
 
 pub const NUM_ACCOUNTS: usize = 4;
 
@@ -107,22 +107,22 @@ fn create_2022_mint(
     payer: &Keypair,
     decimals: u8,
 ) -> Result<Pubkey, FailedTransactionMetadata> {
-    let mint_size = spl_token_2022::extension::ExtensionType::try_calculate_account_len::<
-        spl_token_2022::state::Mint,
+    let mint_size = spl_token_2022_interface::extension::ExtensionType::try_calculate_account_len::<
+        spl_token_2022_interface::state::Mint,
     >(&[])?;
     let mint_kp = Keypair::new();
     let mint_pk = mint_kp.pubkey();
     let token_program_id = spl_2022_id();
     let payer_pk = payer.pubkey();
 
-    let ix1 = solana_sdk::system_instruction::create_account(
+    let ix1 = solana_system_interface::instruction::create_account(
         &payer_pk,
         &mint_pk,
         svm.minimum_balance_for_rent_exemption(mint_size),
         mint_size as u64,
         &token_program_id,
     );
-    let ix2 = spl_token_2022::instruction::initialize_mint2(
+    let ix2 = spl_token_2022_interface::instruction::initialize_mint2(
         &token_program_id,
         &mint_pk,
         &payer_pk,
@@ -156,7 +156,7 @@ fn mint_2022(
     let signing_keys = [&payer_pk];
     let signer_keys = signing_keys.as_slice();
 
-    let ix = spl_token_2022::instruction::mint_to(
+    let ix = spl_token_2022_interface::instruction::mint_to(
         &token_program_id,
         mint,
         destination,

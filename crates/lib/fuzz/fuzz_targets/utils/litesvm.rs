@@ -6,7 +6,7 @@ use litesvm::{
     LiteSVM,
 };
 use serde_json::json;
-use solana_account_decoder::{encode_ui_account, UiAccount, UiAccountData, UiAccountEncoding};
+//use solana_account_decoder::{encode_ui_account, UiAccount, UiAccountData, UiAccountEncoding};
 use solana_client::{
     client_error::Result,
     rpc_config::RpcSimulateTransactionConfig,
@@ -16,10 +16,12 @@ use solana_client::{
 };
 use solana_sdk::{
     account::{Account, AccountSharedData},
+    clock::Clock,
     pubkey::Pubkey,
 };
+use solana_account_decoder::{encode_ui_account, UiAccount, UiAccountEncoding, UiDataSliceConfig};
 use solana_transaction_status_client_types::{
-    InnerInstruction, InnerInstructions, UiInnerInstructions,
+    InnerInstruction, InnerInstructions, UiInnerInstructions
 };
 
 pub struct LiteSVMSender(pub LiteSVM);
@@ -40,14 +42,15 @@ impl RpcSender for LiteSVMSender {
                 let acct = self.0.get_account(&pubkey);
                 match acct {
                     Some(acct) => {
-                        let ui_account = encode_ui_account(
-                            &pubkey,
-                            &acct,
-                            UiAccountEncoding::Base64,
-                            None,
-                            None,
-                        );
-                        serde_json::to_value(ui_account)?
+                        //let ui_account = encode_ui_account(
+                        //    &pubkey,
+                        //    &acct,
+                        //    UiAccountEncoding::Base64,
+                        //    None,
+                        //    None,
+                        //);
+                        //serde_json::to_value(ui_account)?
+                        serde_json::to_value(acct)?
                     }
                     None => serde_json::Value::Null,
                 }
@@ -62,13 +65,17 @@ impl RpcSender for LiteSVMSender {
                 );
                 if let Ok((tx, _config)) = config {
                     let versioned = TransactionUtil::decode_b64_transaction(&tx).unwrap();
-                    let simulated_result = self.0.simulate_transaction(versioned);
+                    let simulated_result = self.0.simulate_transaction(versioned.clone());
 
                     let (metadata, res) = match simulated_result {
                         Ok(SimulatedTransactionInfo { meta, post_accounts }) => {
                             (meta, Ok(post_accounts))
                         }
-                        Err(FailedTransactionMetadata { err, meta }) => (meta, Err(err)),
+                        Err(FailedTransactionMetadata { err, meta }) => {
+                            println!("{err:#?}\n{meta:#?}\n{versioned:#?}");
+                            panic!();
+                            (meta, Err(err))
+                        }
                     };
 
                     let TransactionMetadata {
@@ -84,7 +91,7 @@ impl RpcSender for LiteSVMSender {
                     let accounts = res.as_ref().ok().map(post_accounts_to_ui_accounts);
 
                     serde_json::to_value(RpcSimulateTransactionResult {
-                        err: res.err(),
+                        err: res.err().map(|e| e.into()),
                         logs: Some(logs),
                         accounts: accounts,
                         units_consumed: Some(compute_units_consumed),
@@ -92,6 +99,12 @@ impl RpcSender for LiteSVMSender {
                         return_data: Some(return_data.into()),
                         inner_instructions: Some(ui_instructions),
                         replacement_blockhash: None,
+                        fee: None,
+                        pre_balances: None,
+                        post_balances: None,
+                        pre_token_balances: None,
+                        post_token_balances: None,
+                        loaded_addresses: None,
                     })
                     .unwrap()
                 } else {
@@ -136,19 +149,12 @@ fn post_accounts_to_ui_accounts(
 ) -> Vec<Option<UiAccount>> {
     metadata
         .iter()
-        .map(|(_, account_shared_data)| {
-            let account: Account = account_shared_data.clone().into();
-            let data =
-                UiAccountData::Binary(STANDARD.encode(account.data), UiAccountEncoding::Base64);
-            Some(UiAccount {
-                lamports: account.lamports,
-                data: data,
-                owner: account.owner.to_string(),
-                executable: account.executable,
-                rent_epoch: account.rent_epoch,
-                space: None,
-            })
-        })
+        .map(|(address, account_shared_data)| {
+            let account = encode_ui_account(address, account_shared_data, UiAccountEncoding::Binary, None, None);
+            Some(account)
+        }
+            )
+        
         .collect()
 }
 

@@ -3,9 +3,9 @@
 mod utils;
 use arbitrary::Unstructured;
 use kora_lib::{
-    config::FeePayerPolicy,
-    rpc_server::{method::sign_transaction_if_paid::SignTransactionIfPaidRequest, KoraRpc},
-    signer::{KoraSigner, SignerPool, SignerWithMetadata, SolanaMemorySigner},
+    config::{FeePayerPolicy, Token2022InstructionPolicy},
+    rpc_server::{KoraRpc, method::sign_transaction::SignTransactionRequest},
+    signer::{signer::Signer, SignerPool, SignerWithMetadata},
     state::{update_config, update_signer_pool},
     tests::config_mock::ConfigMockBuilder,
     transaction::{VersionedTransactionOps, VersionedTransactionResolved},
@@ -15,12 +15,15 @@ use libfuzzer_sys::fuzz_target;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
 use solana_message::Message;
 use solana_sdk::{
+    signature::Signer as _,
     instruction::Instruction,
-    signer::Signer,
     transaction::{Transaction, VersionedTransaction},
 };
-use spl_token_2022::instruction::transfer_checked;
-use std::sync::{Arc, LazyLock};
+use spl_token_2022_interface::instruction::transfer_checked;
+use std::{
+    sync::{Arc, LazyLock},
+    time::Instant,
+};
 use utils::{
     common::{BuildableInstruction, InitialState},
     FuzzInstruction, LiteSVMSender,
@@ -50,13 +53,16 @@ fuzz_target!(|data: &[u8]| {
             "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL".parse().unwrap(), // ATA Program
         ])
         .with_fee_payer_policy(FeePayerPolicy {
-            allow_token2022_transfers: false,
+            token_2022: Token2022InstructionPolicy {
+                allow_transfer: false,
+                ..Default::default()
+            },
             ..Default::default()
         })
         .build();
 
-    let signer = KoraSigner::Memory(SolanaMemorySigner::new(kora_signer.insecure_clone()));
-    let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), signer, 1);
+    let signer = Signer::from_memory(str::from_utf8(kora_signer.secret_bytes()).unwrap()).unwrap();
+    let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), Arc::new(signer), 1);
     let pool = SignerPool::new(vec![signer_metadata]);
 
     update_config(fuzzconfig).unwrap();
@@ -79,7 +85,7 @@ fuzz_target!(|data: &[u8]| {
     .unwrap();
 
     let TokenMetadata { program, mint_pubkey, decimals, atas, .. } = spl_2022_metadata;
-    let payment_2022_ix = spl_token_2022::instruction::transfer_checked(
+    let payment_2022_ix = spl_token_2022_interface::instruction::transfer_checked(
         &program,
         &atas[2],
         &mint_pubkey,
@@ -119,7 +125,7 @@ fuzz_target!(|data: &[u8]| {
     );
     let transaction = Transaction::new_unsigned(message);
     let vt = VersionedTransaction::from(transaction.clone());
-    let tx = VersionedTransactionResolved::from_kora_built_transaction(&vt);
+    let tx = VersionedTransactionResolved::from_kora_built_transaction(&vt).unwrap();
 
     let sender = LiteSVMSender(svm);
     let rpc_config = RpcClientConfig::default();
@@ -127,12 +133,12 @@ fuzz_target!(|data: &[u8]| {
 
     let rpc = KoraRpc::new(Arc::new(rpc_client));
 
-    let request = SignTransactionIfPaidRequest {
+    let request = SignTransactionRequest {
         transaction: tx.encode_b64_transaction().unwrap(),
         signer_key: None,
         sig_verify: false,
     };
-    let res = pollster::block_on(rpc.sign_transaction_if_paid(request));
+    let res = pollster::block_on(rpc.sign_transaction(request));
 
     if let Ok(res) = res {
         panic!();
