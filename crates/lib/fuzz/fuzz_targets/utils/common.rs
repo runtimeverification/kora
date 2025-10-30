@@ -1,4 +1,5 @@
 use arbitrary::{Result, Unstructured};
+use kora_lib::signer::{KoraSigner, SignerPool, SignerWithMetadata, SolanaMemorySigner};
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
@@ -182,4 +183,10 @@ pub trait BuildableInstruction {
         spl_2022_meta: TokenMetadata,
         accounts: &[Pubkey],
     ) -> Result<Instruction>;
+}
+
+pub fn build_signer_pool(kora_signer: Keypair) -> SignerPool {
+    let signer = KoraSigner::Memory(SolanaMemorySigner::new(kora_signer));
+    let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), signer, 1);
+    SignerPool::new(vec![signer_metadata])
 }

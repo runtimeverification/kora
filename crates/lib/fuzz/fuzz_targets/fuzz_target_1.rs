@@ -5,7 +5,6 @@ use arbitrary::Unstructured;
 use kora_lib::{
     config::FeePayerPolicy,
     rpc_server::{method::sign_transaction_if_paid::SignTransactionIfPaidRequest, KoraRpc},
-    signer::{KoraSigner, SignerPool, SignerWithMetadata, SolanaMemorySigner},
     state::{update_config, update_signer_pool},
     tests::config_mock::ConfigMockBuilder,
     transaction::{VersionedTransactionOps, VersionedTransactionResolved},
@@ -26,7 +25,7 @@ use utils::{
     FuzzInstruction, LiteSVMSender,
 };
 
-use crate::utils::common::TokenMetadata;
+use crate::utils::common::{build_signer_pool, TokenMetadata};
 
 static SVM_INIT: LazyLock<InitialState> = LazyLock::new(|| InitialState::new());
 
@@ -56,9 +55,7 @@ fuzz_target!(|data: &[u8]| {
         })
         .build();
 
-    let signer = KoraSigner::Memory(SolanaMemorySigner::new(kora_signer.insecure_clone()));
-    let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), signer, 1);
-    let pool = SignerPool::new(vec![signer_metadata]);
+    let pool = build_signer_pool(kora_signer.insecure_clone());
 
     update_config(fuzzconfig).unwrap();
     update_signer_pool(pool).unwrap();

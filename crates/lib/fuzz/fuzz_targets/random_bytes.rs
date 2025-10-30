@@ -2,8 +2,7 @@
 
 mod utils;
 use std::{
-    env,
-    fmt::{self, Pointer},
+    fmt,
     sync::{Arc, LazyLock},
 };
 
@@ -11,70 +10,18 @@ use arbitrary::{Arbitrary, Unstructured};
 use base64::Engine;
 use kora_lib::{
     rpc_server::{method::sign_transaction_if_paid::SignTransactionIfPaidRequest, KoraRpc},
-    signer::{signer::Signer, KoraSigner, SignerPool, SignerWithMetadata, SolanaMemorySigner},
-    state::{init_signer_pool, update_config, update_signer_pool},
-    tests::config_mock::{get_default_signer_pool_config, ConfigMockBuilder},
-    transaction::{TransactionUtil, VersionedTransactionOps, VersionedTransactionResolved},
+    state::{update_config, update_signer_pool},
+    tests::config_mock::ConfigMockBuilder,
+    transaction::TransactionUtil,
     usage_limit::UsageTracker,
 };
 use libfuzzer_sys::fuzz_target;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
-use solana_message::{compiled_instruction::CompiledInstruction, Message, MessageHeader};
-use solana_sdk::{
-    hash::{Hash, HASH_BYTES},
-    pubkey::Pubkey,
-    signature::Keypair,
-    transaction::{Transaction, VersionedTransaction},
-};
 use utils::common::InitialState;
 
-use crate::utils::LiteSVMSender;
+use crate::utils::{common::build_signer_pool, LiteSVMSender};
 
 static INIT_SVM: LazyLock<InitialState> = LazyLock::new(|| InitialState::new());
-
-#[derive(Debug)]
-struct FuzzMessage(pub Message);
-
-impl<'a> Arbitrary<'a> for FuzzMessage {
-    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let message = Message {
-            header: MessageHeader {
-                num_required_signatures: u.int_in_range(0..=u8::MAX).unwrap(),
-                num_readonly_signed_accounts: u.int_in_range(0..=u8::MAX).unwrap(),
-                num_readonly_unsigned_accounts: u.int_in_range(0..=u8::MAX).unwrap(),
-            },
-            account_keys: u
-                .int_in_range(0..=10)
-                .and_then(|len| {
-                    u.arbitrary_iter::<[u8; 32]>()
-                        .unwrap()
-                        .take(len)
-                        .map(|bytes| Ok(Pubkey::new_from_array(bytes.unwrap())))
-                        .collect()
-                })
-                .unwrap(),
-            recent_blockhash: Hash::new_from_array(u.arbitrary::<[u8; HASH_BYTES]>().unwrap()),
-            instructions: u
-                .int_in_range(0..=10)
-                .and_then(|len| {
-                    u.arbitrary_iter::<(u8, Vec<u8>, Vec<u8>)>()
-                        .unwrap()
-                        .take(len)
-                        .map(|data| {
-                            let (program_id_index, data, accounts) = data.unwrap();
-                            Ok(CompiledInstruction::new_from_raw_parts(
-                                program_id_index,
-                                data,
-                                accounts,
-                            ))
-                        })
-                        .collect()
-                })
-                .unwrap(),
-        };
-        Ok(Self(message))
-    }
-}
 
 struct FuzzSignTransactionIfPaidRequest(SignTransactionIfPaidRequest);
 
@@ -106,9 +53,7 @@ fuzz_target!(|data: FuzzSignTransactionIfPaidRequest| {
     let svm = (*svm).clone();
 
     let config = ConfigMockBuilder::new().with_cache_enabled(false).build();
-    let signer = KoraSigner::Memory(SolanaMemorySigner::new(kora_signer.insecure_clone()));
-    let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), signer, 1);
-    let pool = SignerPool::new(vec![signer_metadata]);
+    let pool = build_signer_pool(kora_signer.insecure_clone());
 
     update_config(config).unwrap();
     update_signer_pool(pool).unwrap();
