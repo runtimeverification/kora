@@ -42,8 +42,9 @@ cargo fuzz cov "${TARGET}"
 echo "Running llvm-cov"
 ${LLVM_COV} show \
     "target/${HOST}/coverage/${HOST}/release/${TARGET}" \
-    --instr-profile=./coverage/"${TARGET}"/coverage.profdata \
-    --sources="$(find .. -name "*.rs")" \
-    --format=html \
+    --instr-profile="./coverage/${TARGET}/coverage.profdata" \
+    --ignore-filename-regex=".cargo/registry|rustc|.rustup/toolchains" \
+    --format="html" \
     --output-dir="./coverage/${TARGET}/html" \
-    --show-line-counts-or-regions "${DEMANGLER_OPTION}"
+    --show-line-counts-or-regions \
+    "${DEMANGLER_OPTION}"
