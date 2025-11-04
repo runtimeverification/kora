@@ -41,3 +41,10 @@ path = "fuzz_targets/random_bytes.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "balance_check"
+path = "fuzz_targets/balance_check.rs"
+test = false
+doc = false
+bench = false
