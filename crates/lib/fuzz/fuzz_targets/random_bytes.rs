@@ -50,7 +50,7 @@ impl fmt::Debug for FuzzSignTransactionIfPaidRequest {
 
 fuzz_target!(|data: FuzzSignTransactionIfPaidRequest| {
     let InitialState { svm, kora_signer, .. } = &*INIT_SVM;
-    let svm = (*svm).clone();
+    let svm = Arc::new((*svm).clone());
 
     let config = ConfigMockBuilder::new().with_cache_enabled(false).build();
     let pool = build_signer_pool(kora_signer.insecure_clone());

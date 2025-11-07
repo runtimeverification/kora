@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use kora_lib::transaction::TransactionUtil;
@@ -23,7 +25,7 @@ use solana_transaction_status_client_types::{
     InnerInstruction, InnerInstructions, UiInnerInstructions,
 };
 
-pub struct LiteSVMSender(pub LiteSVM);
+pub struct LiteSVMSender(pub Arc<LiteSVM>);
 
 #[async_trait]
 impl RpcSender for LiteSVMSender {

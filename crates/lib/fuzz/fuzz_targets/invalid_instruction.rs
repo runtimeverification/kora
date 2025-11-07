@@ -33,7 +33,7 @@ fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
 
     let InitialState { svm, spl_metadata, spl_2022_metadata, accounts, kora_signer } = &*SVM_INIT;
-    let svm = (*svm).clone(); // Very important to clone here for an iteration-specific instance of the vm
+    let svm = Arc::new((*svm).clone()); // Very important to clone here for an iteration-specific instance of the vm
 
     // Create kora configuration
     let allowed_tokens =
