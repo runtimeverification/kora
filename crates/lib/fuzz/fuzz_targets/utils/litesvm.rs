@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::common::FuzzUtils;
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use kora_lib::transaction::TransactionUtil;
@@ -19,11 +20,35 @@ use solana_client::{
 use solana_sdk::{
     account::{Account, AccountSharedData},
     clock::Clock,
+    program_pack::Pack,
     pubkey::Pubkey,
 };
 use solana_transaction_status_client_types::{
     InnerInstruction, InnerInstructions, UiInnerInstructions,
 };
+use spl_token::{state::Account as SplAccount, ID};
+use spl_token_2022::{state::Account as SplAccount2022, ID as ID_2022};
+
+impl FuzzUtils for LiteSVM {
+    fn token_balance(&self, ata: &Pubkey) -> std::result::Result<u64, String> {
+        let account_data = self.get_account(ata).ok_or("Couldn't retrieve account".to_string())?;
+        if account_data.owner == ID {
+            let spl_account =
+                SplAccount::unpack(&account_data.data).map_err(|err| format!("{err}"))?;
+            Ok(spl_account.amount)
+        } else if account_data.owner == ID_2022 {
+            let spl_account =
+                SplAccount2022::unpack(&account_data.data).map_err(|err| format!("{err}"))?;
+            Ok(spl_account.amount)
+        } else {
+            let err_string = format!(
+                "Account is not owned by a token program\nOwner: {}, ID: {}, ID_2022: {}",
+                account_data.owner, ID, ID_2022
+            );
+            Err(err_string)
+        }
+    }
+}
 
 pub struct LiteSVMSender(pub Arc<LiteSVM>);
 

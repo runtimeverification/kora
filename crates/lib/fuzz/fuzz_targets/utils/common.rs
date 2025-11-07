@@ -190,3 +190,7 @@ pub fn build_signer_pool(kora_signer: Keypair) -> SignerPool {
     let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), signer, 1);
     SignerPool::new(vec![signer_metadata])
 }
+
+pub trait FuzzUtils {
+    fn token_balance(&self, ata: &Pubkey) -> std::result::Result<u64, String>;
+}
