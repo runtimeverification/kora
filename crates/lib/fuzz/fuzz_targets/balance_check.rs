@@ -39,6 +39,12 @@ fuzz_target!(|data: &[u8]| {
         .with_cache_enabled(false)
         .with_allowed_tokens(allowed_tokens.clone())
         .with_allowed_spl_paid_tokens(SplTokenConfig::Allowlist(allowed_tokens))
+        .with_allowed_programs(vec![
+            "11111111111111111111111111111111".parse().unwrap(), // System Program
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse().unwrap(), // Token Program
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb".parse().unwrap(), // Token-2022 Program
+            "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL".parse().unwrap(), // ATA Program
+        ])
         .build();
     let pool = build_signer_pool(kora_signer.insecure_clone());
 
@@ -102,16 +108,14 @@ fuzz_target!(|data: &[u8]| {
 
         let kora_ata = spl_metadata.atas[0]; // Index 0 = Kora signer's account
         let kora_lamports_before = svm.get_account(&accounts[0]).unwrap().lamports;
-        let spl_tokens_before = svm.token_balance(&kora_ata).unwrap();
+        let spl_tokens_before = svm.token_balance(&kora_ata).unwrap() * 1_000_000;
 
         let _tx_res = svm.send_transaction(transaction.transaction.clone());
 
         let kora_lamports = svm.get_account(&accounts[0]).unwrap().lamports;
-        let spl_tokens = svm.token_balance(&kora_ata).unwrap();
+        let spl_tokens = svm.token_balance(&kora_ata).unwrap() * 1_000_000;
 
         // Calculate balance as an aggregate of lamport balances + token balances.
-        // In this case the mock pricing oracle states one token == one lamport, so no
-        // conversions need to be made.
         let initial_balance: i64 = (kora_lamports_before + spl_tokens_before) as i64;
         let after_balance: i64 = (kora_lamports + spl_tokens) as i64;
 
