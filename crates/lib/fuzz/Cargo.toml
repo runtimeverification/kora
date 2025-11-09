@@ -10,10 +10,12 @@ cargo-fuzz = true
 [dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
 async-trait = { workspace = true }
+bincode = { workspace = true }
 libfuzzer-sys = "0.4"
 pollster = "0.4.0"
 serde_json = { workspace = true }
 solana-client = { workspace = true }
+solana-fee = "2.3.13"
 solana-message = { workspace = true }
 solana-sdk = { workspace = true }
 solana-transaction-status-client-types = { workspace = true }

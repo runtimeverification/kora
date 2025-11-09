@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use super::common::FuzzUtils;
 use async_trait::async_trait;
@@ -17,9 +17,14 @@ use solana_client::{
     rpc_response::{Response, RpcResponseContext, RpcSimulateTransactionResult},
     rpc_sender::{RpcSender, RpcTransportStats},
 };
+use solana_fee::{calculate_fee, FeeFeatures};
+use solana_message::{
+    SanitizedMessage, SanitizedVersionedMessage, SimpleAddressLoader, VersionedMessage,
+};
 use solana_sdk::{
     account::{Account, AccountSharedData},
     clock::Clock,
+    commitment_config::CommitmentConfig,
     program_pack::Pack,
     pubkey::Pubkey,
 };
@@ -126,7 +131,27 @@ impl RpcSender for LiteSVMSender {
                     serde_json::Value::Null
                 }
             }
-            "getFeeForMessage" => json!(5000 as u64),
+            "getFeeForMessage" => {
+                let config = serde_json::from_value::<(String, Option<CommitmentConfig>)>(params);
+                if let Ok((message_string, commitment_config)) = config {
+                    let message_bytes = STANDARD.decode(message_string).unwrap();
+                    let message =
+                        bincode::deserialize::<VersionedMessage>(message_bytes.as_slice()).unwrap();
+                    let sanitized_versioned_message =
+                        SanitizedVersionedMessage::try_new(message).unwrap();
+                    let sanitized_message = SanitizedMessage::try_new(
+                        sanitized_versioned_message,
+                        SimpleAddressLoader::Disabled,
+                        &HashSet::new(),
+                    )
+                    .unwrap();
+                    let fee_features = FeeFeatures { enable_secp256r1_precompile: true };
+                    let fee = calculate_fee(&sanitized_message, false, 5000, 0, fee_features);
+                    json!(fee)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
             "getEpochInfo" => {
                 let clock: Clock = self.0.get_sysvar::<Clock>();
                 let slot = clock.slot;
