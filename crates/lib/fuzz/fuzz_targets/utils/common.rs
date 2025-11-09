@@ -103,6 +103,9 @@ impl InitialState {
     }
 }
 
+// litesvm_token::CreateMint has different behavior for creating an spl-2022 mint.
+// Unfortunately, it's behind a feature flag which precludes it from making a legacy
+// spl mint. So, we make an spl-2022 mint ourselves here.
 fn create_2022_mint(
     svm: &mut LiteSVM,
     payer: &Keypair,
@@ -143,6 +146,7 @@ fn create_2022_mint(
     Ok(mint_pk)
 }
 
+// Same as above, but for minting spl-2022 tokens.
 fn mint_2022(
     svm: &mut LiteSVM,
     payer: &Keypair,
