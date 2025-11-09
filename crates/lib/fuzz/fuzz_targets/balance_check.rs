@@ -21,7 +21,7 @@ use solana_sdk::{
 };
 
 use crate::utils::{
-    common::{build_signer_pool, BuildableInstruction, InitialState},
+    common::{build_signer_pool, BuildableInstruction, FuzzUtils, InitialState},
     FuzzInstruction, LiteSVMSender,
 };
 
@@ -32,6 +32,7 @@ fuzz_target!(|data: &[u8]| {
     let InitialState { svm, spl_metadata, spl_2022_metadata, accounts, kora_signer } = &*SVM_INIT;
     let mut svm = Arc::new((*svm).clone());
 
+    // Set up the Kora config
     let allowed_tokens =
         vec![spl_metadata.mint_pubkey.to_string(), spl_2022_metadata.mint_pubkey.to_string()];
     let config = ConfigMockBuilder::new()
@@ -45,7 +46,12 @@ fuzz_target!(|data: &[u8]| {
     update_signer_pool(pool).unwrap();
     let _ = pollster::block_on(UsageTracker::init_usage_limiter());
 
-    let n = u.int_in_range(1..=20).unwrap();
+    let sender = LiteSVMSender(svm.clone());
+    let rpc_config = RpcClientConfig::default();
+    let rpc_client = RpcClient::new_sender(sender, rpc_config);
+
+    // Create the random instructions
+    let n = u.int_in_range(10..=50).unwrap();
     let ixs: Vec<FuzzInstruction> =
         u.arbitrary_iter::<FuzzInstruction>().unwrap().take(n).map(|i| i.unwrap()).collect();
     let mut ixs: Vec<Instruction> = ixs
@@ -53,14 +59,22 @@ fuzz_target!(|data: &[u8]| {
         .map(|i| i.build(&mut u, *spl_metadata, *spl_2022_metadata, accounts.as_slice()).unwrap())
         .collect();
 
+    // Get the message fee for the transaction w/ random instructions
+    let mut fee_transaction =
+        Transaction::new_with_payer(ixs.as_slice(), Some(&kora_signer.pubkey()));
+    fee_transaction.message.recent_blockhash = svm.latest_blockhash();
+    let fee_message = fee_transaction.message;
+    let fee = pollster::block_on(rpc_client.get_fee_for_message(&fee_message)).unwrap();
+
+    // Create the payment instruction based off of the fee
     let payment_ix = spl_token::instruction::transfer_checked(
         &spl_metadata.program,
         &spl_metadata.atas[1],
         &spl_metadata.mint_pubkey,
-        &spl_metadata.atas[0],
+        &spl_metadata.atas[0], // Index 0 = Kora signer's account
         &accounts[1],
         &[],
-        1_000_000,
+        fee,
         spl_metadata.decimals,
     )
     .unwrap();
@@ -79,14 +93,49 @@ fuzz_target!(|data: &[u8]| {
         sig_verify: false,
     };
 
-    let sender = LiteSVMSender(svm.clone());
-    let rpc_config = RpcClientConfig::default();
-    let rpc_client = RpcClient::new_sender(sender, rpc_config);
     let rpc = KoraRpc::new(Arc::new(rpc_client));
 
     let res = pollster::block_on(rpc.sign_transaction_if_paid(request));
 
     if let Ok(res) = res {
+        let mut svm = (*svm).clone();
 
+        let kora_ata = spl_metadata.atas[0]; // Index 0 = Kora signer's account
+        let kora_lamports_before = svm.get_account(&accounts[0]).unwrap().lamports;
+        let spl_tokens_before = svm.token_balance(&kora_ata).unwrap();
+
+        let _tx_res = svm.send_transaction(transaction.transaction.clone());
+
+        let kora_lamports = svm.get_account(&accounts[0]).unwrap().lamports;
+        let spl_tokens = svm.token_balance(&kora_ata).unwrap();
+
+        // Calculate balance as an aggregate of lamport balances + token balances.
+        // In this case the mock pricing oracle states one token == one lamport, so no
+        // conversions need to be made.
+        let initial_balance: i64 = (kora_lamports_before + spl_tokens_before) as i64;
+        let after_balance: i64 = (kora_lamports + spl_tokens) as i64;
+
+        if after_balance < initial_balance {
+            println!("{:#?}", transaction.transaction);
+            println!(
+                "Balances:\n    total before/after/diff: {} {} {}",
+                initial_balance,
+                after_balance,
+                after_balance - initial_balance
+            );
+            println!(
+                "Balances:\n    lamports before/after/diff: {} {} {}",
+                kora_lamports_before,
+                kora_lamports,
+                (kora_lamports as i64) - (kora_lamports_before as i64)
+            );
+            println!(
+                "Balances:\n    spl_tokens before/after/diff: {} {} {}",
+                spl_tokens_before,
+                spl_tokens,
+                (spl_tokens as i64) - (spl_tokens_before as i64)
+            );
+            assert!(false);
+        }
     }
 });
