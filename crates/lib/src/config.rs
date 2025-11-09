@@ -136,7 +136,6 @@ impl ValidationConfig {
     }
 }
 
-#[cfg_attr(feature="fuzzing", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct FeePayerPolicy {
     #[serde(default)]

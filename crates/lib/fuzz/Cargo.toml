@@ -10,10 +10,12 @@ cargo-fuzz = true
 [dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
 async-trait = { workspace = true }
+bincode = { workspace = true }
 libfuzzer-sys = "0.4"
 pollster = "0.4.0"
 serde_json = { workspace = true }
 solana-client = { workspace = true }
+solana-fee = "3.0.8"
 solana-message = { workspace = true }
 solana-sdk = { workspace = true }
 solana-system-interface = { workspace = true }
@@ -24,14 +26,29 @@ litesvm = "0.8.1"
 litesvm-token = "0.8.1"
 base64 = { workspace = true }
 solana-account-decoder = "3.0.8"
+solana-commitment-config.workspace = true
 
 [dependencies.kora-lib]
 path = ".."
 features = ["fuzzing"]
 
 [[bin]]
-name = "fuzz_target_1"
-path = "fuzz_targets/fuzz_target_1.rs"
+name = "invalid_instruction"
+path = "fuzz_targets/invalid_instruction.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "random_bytes"
+path = "fuzz_targets/random_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "balance_check"
+path = "fuzz_targets/balance_check.rs"
 test = false
 doc = false
 bench = false

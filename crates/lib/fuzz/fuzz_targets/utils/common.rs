@@ -1,11 +1,14 @@
+use std::sync::Arc;
+
 use arbitrary::{Result, Unstructured};
+use kora_lib::signer::{signer::Signer, SignerPool, SignerWithMetadata};
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use solana_sdk::{
-    instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
+    instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer as _,
     transaction::Transaction,
 };
-use spl_token_interface::id as spl_id;
 use spl_token_2022_interface::id as spl_2022_id;
+use spl_token_interface::id as spl_id;
 
 pub const NUM_ACCOUNTS: usize = 4;
 
@@ -102,6 +105,9 @@ impl InitialState {
     }
 }
 
+// litesvm_token::CreateMint has different behavior for creating an spl-2022 mint.
+// Unfortunately, it's behind a feature flag which precludes it from making a legacy
+// spl mint. So, we make an spl-2022 mint ourselves here.
 fn create_2022_mint(
     svm: &mut LiteSVM,
     payer: &Keypair,
@@ -142,6 +148,7 @@ fn create_2022_mint(
     Ok(mint_pk)
 }
 
+// Same as above, but for minting spl-2022 tokens.
 fn mint_2022(
     svm: &mut LiteSVM,
     payer: &Keypair,
@@ -182,4 +189,16 @@ pub trait BuildableInstruction {
         spl_2022_meta: TokenMetadata,
         accounts: &[Pubkey],
     ) -> Result<Instruction>;
+}
+
+pub fn build_signer_pool(kora_signer: Keypair) -> SignerPool {
+    //let signer = KoraSigner::Memory(SolanaMemorySigner::new(kora_signer));
+    let signer = Signer::from_memory(kora_signer.to_base58_string().as_str());
+    let signer_metadata =
+        SignerWithMetadata::new("KoraSigner".parse().unwrap(), Arc::new(signer.unwrap()), 1);
+    SignerPool::new(vec![signer_metadata])
+}
+
+pub trait FuzzUtils {
+    fn token_balance(&self, ata: &Pubkey) -> std::result::Result<u64, String>;
 }

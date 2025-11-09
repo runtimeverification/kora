@@ -1,3 +1,6 @@
+use std::{collections::HashSet, sync::Arc};
+
+use super::common::FuzzUtils;
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use kora_lib::transaction::TransactionUtil;
@@ -7,6 +10,7 @@ use litesvm::{
 };
 use serde_json::json;
 //use solana_account_decoder::{encode_ui_account, UiAccount, UiAccountData, UiAccountEncoding};
+use solana_account_decoder::{encode_ui_account, UiAccount, UiAccountEncoding, UiDataSliceConfig};
 use solana_client::{
     client_error::Result,
     rpc_config::RpcSimulateTransactionConfig,
@@ -14,17 +18,45 @@ use solana_client::{
     rpc_response::{Response, RpcResponseContext, RpcSimulateTransactionResult},
     rpc_sender::{RpcSender, RpcTransportStats},
 };
+use solana_commitment_config::CommitmentConfig;
+use solana_fee::{calculate_fee, FeeFeatures};
+use solana_message::{
+    SanitizedMessage, SanitizedVersionedMessage, SimpleAddressLoader, VersionedMessage,
+};
 use solana_sdk::{
     account::{Account, AccountSharedData},
     clock::Clock,
+    program_pack::Pack,
     pubkey::Pubkey,
 };
-use solana_account_decoder::{encode_ui_account, UiAccount, UiAccountEncoding, UiDataSliceConfig};
 use solana_transaction_status_client_types::{
-    InnerInstruction, InnerInstructions, UiInnerInstructions
+    InnerInstruction, InnerInstructions, UiInnerInstructions,
 };
+use spl_token_2022_interface::{state::Account as SplAccount2022, ID as ID_2022};
+use spl_token_interface::{state::Account as SplAccount, ID};
 
-pub struct LiteSVMSender(pub LiteSVM);
+impl FuzzUtils for LiteSVM {
+    fn token_balance(&self, ata: &Pubkey) -> std::result::Result<u64, String> {
+        let account_data = self.get_account(ata).ok_or("Couldn't retrieve account".to_string())?;
+        if account_data.owner == ID {
+            let spl_account =
+                SplAccount::unpack(&account_data.data).map_err(|err| format!("{err}"))?;
+            Ok(spl_account.amount)
+        } else if account_data.owner == ID_2022 {
+            let spl_account =
+                SplAccount2022::unpack(&account_data.data).map_err(|err| format!("{err}"))?;
+            Ok(spl_account.amount)
+        } else {
+            let err_string = format!(
+                "Account is not owned by a token program\nOwner: {}, ID: {}, ID_2022: {}",
+                account_data.owner, ID, ID_2022
+            );
+            Err(err_string)
+        }
+    }
+}
+
+pub struct LiteSVMSender(pub Arc<LiteSVM>);
 
 #[async_trait]
 impl RpcSender for LiteSVMSender {
@@ -71,11 +103,7 @@ impl RpcSender for LiteSVMSender {
                         Ok(SimulatedTransactionInfo { meta, post_accounts }) => {
                             (meta, Ok(post_accounts))
                         }
-                        Err(FailedTransactionMetadata { err, meta }) => {
-                            println!("{err:#?}\n{meta:#?}\n{versioned:#?}");
-                            panic!();
-                            (meta, Err(err))
-                        }
+                        Err(FailedTransactionMetadata { err, meta }) => (meta, Err(err)),
                     };
 
                     let TransactionMetadata {
@@ -111,7 +139,27 @@ impl RpcSender for LiteSVMSender {
                     serde_json::Value::Null
                 }
             }
-            "getFeeForMessage" => json!(5000 as u64),
+            "getFeeForMessage" => {
+                let config = serde_json::from_value::<(String, Option<CommitmentConfig>)>(params);
+                if let Ok((message_string, commitment_config)) = config {
+                    let message_bytes = STANDARD.decode(message_string).unwrap();
+                    let message =
+                        bincode::deserialize::<VersionedMessage>(message_bytes.as_slice()).unwrap();
+                    let sanitized_versioned_message =
+                        SanitizedVersionedMessage::try_new(message).unwrap();
+                    let sanitized_message = SanitizedMessage::try_new(
+                        sanitized_versioned_message,
+                        SimpleAddressLoader::Disabled,
+                        &HashSet::new(),
+                    )
+                    .unwrap();
+                    let fee_features = FeeFeatures { enable_secp256r1_precompile: true };
+                    let fee = calculate_fee(&sanitized_message, false, 5000, 0, fee_features);
+                    json!(fee)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
             "getEpochInfo" => {
                 let clock: Clock = self.0.get_sysvar::<Clock>();
                 let slot = clock.slot;
@@ -150,11 +198,15 @@ fn post_accounts_to_ui_accounts(
     metadata
         .iter()
         .map(|(address, account_shared_data)| {
-            let account = encode_ui_account(address, account_shared_data, UiAccountEncoding::Binary, None, None);
+            let account = encode_ui_account(
+                address,
+                account_shared_data,
+                UiAccountEncoding::Binary,
+                None,
+                None,
+            );
             Some(account)
-        }
-            )
-        
+        })
         .collect()
 }
 

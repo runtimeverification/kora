@@ -4,7 +4,7 @@ mod utils;
 use arbitrary::Unstructured;
 use kora_lib::{
     config::{FeePayerPolicy, Token2022InstructionPolicy},
-    rpc_server::{KoraRpc, method::sign_transaction::SignTransactionRequest},
+    rpc_server::{method::sign_transaction::SignTransactionRequest, KoraRpc},
     signer::{signer::Signer, SignerPool, SignerWithMetadata},
     state::{update_config, update_signer_pool},
     tests::config_mock::ConfigMockBuilder,
@@ -15,8 +15,8 @@ use libfuzzer_sys::fuzz_target;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
 use solana_message::Message;
 use solana_sdk::{
-    signature::Signer as _,
     instruction::Instruction,
+    signature::Signer as _,
     transaction::{Transaction, VersionedTransaction},
 };
 use spl_token_2022_interface::instruction::transfer_checked;
@@ -29,7 +29,7 @@ use utils::{
     FuzzInstruction, LiteSVMSender,
 };
 
-use crate::utils::common::TokenMetadata;
+use crate::utils::common::{build_signer_pool, TokenMetadata};
 
 static SVM_INIT: LazyLock<InitialState> = LazyLock::new(|| InitialState::new());
 
@@ -37,10 +37,11 @@ fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
 
     let InitialState { svm, spl_metadata, spl_2022_metadata, accounts, kora_signer } = &*SVM_INIT;
-    let svm = (*svm).clone(); // Very important to clone here for an iteration-specific instance of the vm
+    let svm = Arc::new((*svm).clone()); // Very important to clone here for an iteration-specific instance of the vm
 
     // Create kora configuration
-    let allowed_tokens = vec![spl_metadata.mint_pubkey.to_string()];
+    let allowed_tokens =
+        vec![spl_metadata.mint_pubkey.to_string(), spl_2022_metadata.mint_pubkey.to_string()];
     let fuzzconfig = ConfigMockBuilder::new()
         .with_cache_enabled(false)
         .with_allowed_tokens(allowed_tokens.clone())
@@ -53,18 +54,12 @@ fuzz_target!(|data: &[u8]| {
             "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL".parse().unwrap(), // ATA Program
         ])
         .with_fee_payer_policy(FeePayerPolicy {
-            token_2022: Token2022InstructionPolicy {
-                allow_transfer: false,
-                ..Default::default()
-            },
+            token_2022: Token2022InstructionPolicy { allow_transfer: false, ..Default::default() },
             ..Default::default()
         })
         .build();
 
-    let signer = Signer::from_memory(str::from_utf8(kora_signer.secret_bytes()).unwrap()).unwrap();
-    let signer_metadata = SignerWithMetadata::new("KoraSigner".parse().unwrap(), Arc::new(signer), 1);
-    let pool = SignerPool::new(vec![signer_metadata]);
-
+    let pool = build_signer_pool(kora_signer.insecure_clone());
     update_config(fuzzconfig).unwrap();
     update_signer_pool(pool).unwrap();
     let _ = pollster::block_on(UsageTracker::init_usage_limiter());
